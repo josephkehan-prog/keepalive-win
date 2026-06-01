@@ -19,6 +19,13 @@
         'PSUseDeclaredVarsMoreThanAssignments',
         # Intentional: UTF-8 without BOM is the standard encoding for PowerShell scripts on
         # modern toolchains; adding a BOM would break compatibility with some editors and tools.
-        'PSUseBOMForUnicodeEncodedFile'
+        'PSUseBOMForUnicodeEncodedFile',
+        # Intentional: 2>$null is used to suppress Test-NetConnection's verbose output.
+        # PSScriptAnalyzer may mis-classify stream-2 redirection as a potential comparison.
+        'PSPossibleIncorrectUsageOfRedirectionOperator',
+        # Intentional: script-level parameters are referenced in nested function bodies
+        # (Install-StartupTask, Start-Headless, Enable-StayAwake) which PSScriptAnalyzer
+        # may not count as usages when checking the script-level param block.
+        'PSReviewUnusedParameter'
     )
 }
