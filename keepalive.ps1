@@ -20,6 +20,18 @@
 .PARAMETER Quiet
     Suppress the periodic status line.
 
+.PARAMETER Install
+    Register a "run at logon" scheduled task ('KeepAlive') that relaunches this CLI
+    automatically, then exit. Any -IntervalSeconds / -Minutes / -Quiet flags given
+    alongside -Install are baked into the task. The task runs with a hidden window.
+
+.PARAMETER Uninstall
+    Remove the 'KeepAlive' logon task, then exit.
+
+.PARAMETER Headless
+    Relaunch this CLI in a hidden, detached background process and return immediately,
+    so you can close the terminal and keep the machine awake. Implies -Quiet.
+
 .EXAMPLE
     pwsh -File .\keepalive.ps1
     Keeps awake until you press Ctrl+C.
@@ -27,12 +39,23 @@
 .EXAMPLE
     pwsh -File .\keepalive.ps1 -Minutes 90 -Quiet
     Stays awake for 90 minutes, no status output.
+
+.EXAMPLE
+    pwsh -File .\keepalive.ps1 -Install -Quiet
+    Registers a logon task so the tool starts automatically each time you sign in.
+
+.EXAMPLE
+    pwsh -File .\keepalive.ps1 -Headless
+    Starts keep-awake in the background and returns; close the terminal freely.
 #>
 [CmdletBinding()]
 param(
     [int]$IntervalSeconds = 60,
     [int]$Minutes = 0,
-    [switch]$Quiet
+    [switch]$Quiet,
+    [switch]$Install,
+    [switch]$Uninstall,
+    [switch]$Headless
 )
 
 . "$PSScriptRoot\KeepAlive.Core.ps1"
@@ -40,6 +63,59 @@ param(
 if (-not (Test-IntervalValid -IntervalSeconds $IntervalSeconds)) {
     Write-Error "IntervalSeconds must be >= 10 (got $IntervalSeconds)."
     exit 1
+}
+
+if ($Install -and $Uninstall) {
+    Write-Error "Use either -Install or -Uninstall, not both."
+    exit 1
+}
+
+# --- Run-at-logon (-Install / -Uninstall) and background (-Headless) ----------
+# These re-launch keepalive.ps1 itself; the actual keep-awake work is unchanged.
+
+function Get-PwshPath {
+    # Full path to the current PowerShell host, so the task/process is unambiguous.
+    return (Get-Process -Id $PID).Path
+}
+
+function Install-StartupTask {
+    $taskName  = Get-StartupTaskName
+    $arguments = Get-StartupArguments -ScriptPath $PSCommandPath `
+        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet:$Quiet -Hidden
+    $action   = New-ScheduledTaskAction -Execute (Get-PwshPath) -Argument $arguments
+    $trigger  = New-ScheduledTaskTrigger -AtLogOn
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger `
+        -Settings $settings -Description 'Keep Windows awake to avoid M365 web auto-logout.' -Force | Out-Null
+}
+
+function Uninstall-StartupTask {
+    Unregister-ScheduledTask -TaskName (Get-StartupTaskName) -Confirm:$false
+}
+
+function Start-Headless {
+    # Spawn a detached, hidden copy and let this foreground invocation return.
+    $arguments = Get-StartupArguments -ScriptPath $PSCommandPath `
+        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet -Hidden
+    Start-Process -FilePath (Get-PwshPath) -ArgumentList $arguments -WindowStyle Hidden | Out-Null
+}
+
+if ($Uninstall) {
+    Uninstall-StartupTask
+    Write-Host "Removed the '$(Get-StartupTaskName)' logon task."
+    exit 0
+}
+
+if ($Install) {
+    Install-StartupTask
+    Write-Host "Installed '$(Get-StartupTaskName)' to run at logon (hidden window)."
+    exit 0
+}
+
+if ($Headless) {
+    Start-Headless
+    Write-Host "Keep-awake started in the background. Close this terminal freely; stop it from Task Manager (pwsh) or 'keepalive -Uninstall' if installed."
+    exit 0
 }
 
 Add-Type -Namespace KeepAlive -Name Native -MemberDefinition @'

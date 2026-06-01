@@ -28,3 +28,31 @@ function Test-ShouldStop {
     if ($null -eq $EndTime) { return $false }   # no end time = never auto-stop
     return ($Now -ge [datetime]$EndTime)
 }
+
+# Name of the scheduled task registered by -Install (run-at-logon feature).
+$script:StartupTaskName = 'KeepAlive'
+
+function Get-StartupTaskName {
+    return $script:StartupTaskName
+}
+
+# Builds the pwsh argument string used to relaunch this CLI — for the run-at-logon
+# task (-Install) and for the detached -Headless launch. Pure string assembly so it
+# can be unit-tested without touching Task Scheduler or spawning a process.
+# Only non-default flags are emitted, so a plain relaunch stays minimal.
+function Get-StartupArguments {
+    param(
+        [string]$ScriptPath,
+        [int]$IntervalSeconds = 60,
+        [int]$Minutes = 0,
+        [switch]$Quiet,
+        [switch]$Hidden
+    )
+    $parts = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
+    if ($Hidden) { $parts += @('-WindowStyle', 'Hidden') }
+    $parts += @('-File', ('"{0}"' -f $ScriptPath))
+    if ($IntervalSeconds -ne 60) { $parts += @('-IntervalSeconds', $IntervalSeconds) }
+    if ($Minutes -ne 0)          { $parts += @('-Minutes', $Minutes) }
+    if ($Quiet)                  { $parts += '-Quiet' }
+    return ($parts -join ' ')
+}

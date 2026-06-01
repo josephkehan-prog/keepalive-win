@@ -58,3 +58,46 @@ Describe 'Test-ShouldStop' {
         Test-ShouldStop -Now $now -EndTime ([datetime]'2026-05-31T11:59:00') | Should Be $true
     }
 }
+
+Describe 'Get-StartupTaskName' {
+    It 'returns the stable task name used by -Install/-Uninstall' {
+        Get-StartupTaskName | Should Be 'KeepAlive'
+    }
+}
+
+Describe 'Get-StartupArguments' {
+    $path = 'C:\Tools\keepalive.ps1'
+
+    It 'emits only the launcher defaults for a plain relaunch' {
+        Get-StartupArguments -ScriptPath $path |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1"'
+    }
+    It 'quotes a script path that contains spaces' {
+        Get-StartupArguments -ScriptPath 'C:\My Tools\keepalive.ps1' |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\My Tools\keepalive.ps1"'
+    }
+    It 'appends -Quiet when requested' {
+        Get-StartupArguments -ScriptPath $path -Quiet |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1" -Quiet'
+    }
+    It 'includes -IntervalSeconds only when it differs from the default 60' {
+        Get-StartupArguments -ScriptPath $path -IntervalSeconds 30 |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1" -IntervalSeconds 30'
+    }
+    It 'omits -IntervalSeconds when it equals the default 60' {
+        Get-StartupArguments -ScriptPath $path -IntervalSeconds 60 |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1"'
+    }
+    It 'includes -Minutes only when non-zero' {
+        Get-StartupArguments -ScriptPath $path -Minutes 90 |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1" -Minutes 90'
+    }
+    It 'inserts -WindowStyle Hidden before -File when -Hidden is set' {
+        Get-StartupArguments -ScriptPath $path -Hidden |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Tools\keepalive.ps1"'
+    }
+    It 'composes every option in launcher-then-script order' {
+        Get-StartupArguments -ScriptPath $path -IntervalSeconds 30 -Minutes 90 -Quiet -Hidden |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Tools\keepalive.ps1" -IntervalSeconds 30 -Minutes 90 -Quiet'
+    }
+}

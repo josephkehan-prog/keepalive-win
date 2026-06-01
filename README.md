@@ -18,11 +18,23 @@ On exit it always restores normal power behavior (`try/finally`).
 keepalive                      # stay awake until Ctrl+C
 keepalive -Minutes 90 -Quiet   # stay awake 90 minutes, no status output
 keepalive -IntervalSeconds 30  # nudge every 30s (minimum 10)
+keepalive -Headless            # run detached in the background, then close the terminal
+keepalive -Install -Quiet      # auto-start at every logon (see below)
+keepalive -Uninstall           # remove the logon auto-start
 ```
 
 Or run the script directly: `pwsh -File .\keepalive.ps1`. Double-click `keepalive.cmd` to launch.
 
-**Run on login:** Task Scheduler → trigger *At log on* → action `pwsh -File <path>\keepalive.ps1 -Quiet`.
+**Run on login (`-Install`):** `keepalive -Install` registers a *Run at logon* scheduled task
+named `KeepAlive` that relaunches the tool automatically (hidden window) each time you sign in.
+Any `-IntervalSeconds` / `-Minutes` / `-Quiet` flags you pass alongside `-Install` are baked into
+the task. Remove it with `keepalive -Uninstall`. (This automates what you'd otherwise set up by
+hand in Task Scheduler.)
+
+**Background (`-Headless`):** `keepalive -Headless` launches a hidden, detached copy and returns
+immediately, so you can close the terminal and keep the machine awake. It implies `-Quiet`. Stop
+it from Task Manager (end the background `pwsh` process), or use `-Install`/`-Uninstall` if you
+want a managed, restart-surviving setup instead.
 
 ## Scope & limitation
 
@@ -35,9 +47,9 @@ M365 idle session timeout that keys off browser-tab interaction. For that case, 
 
 | File | Purpose |
 |---|---|
-| `keepalive.ps1` | The CLI (param block + Win32 P/Invoke + run loop) |
-| `KeepAlive.Core.ps1` | Pure, testable logic (interval validation, end-time math, flag/stop logic) |
-| `KeepAlive.Tests.ps1` | Pester tests (13 tests, 100% core coverage) |
+| `keepalive.ps1` | The CLI (param block + Win32 P/Invoke + run loop + install/headless launch) |
+| `KeepAlive.Core.ps1` | Pure, testable logic (interval validation, end-time math, flag/stop logic, relaunch-arg building) |
+| `KeepAlive.Tests.ps1` | Pester tests (22 tests, 100% core coverage) |
 | `keepalive.cmd` | Double-click / `keepalive` launcher |
 | `plans/` | Construction blueprint, including the optional browser keep-alive step |
 
