@@ -27,8 +27,9 @@
 
 .PARAMETER Install
     Register a "run at logon" scheduled task ('KeepAlive') that relaunches this CLI
-    automatically, then exit. Any -IntervalSeconds / -Minutes / -Quiet flags given
-    alongside -Install are baked into the task. The task runs with a hidden window.
+    automatically, then exit. Any -IntervalSeconds / -Minutes / -Quiet / -SystemOnly /
+    -AllMicrosoftApps flags given alongside -Install are baked into the task. The task
+    runs with a hidden window. If -Install and -Uninstall are both given it is an error.
 
 .PARAMETER Uninstall
     Remove the 'KeepAlive' logon task, then exit.
@@ -103,7 +104,14 @@ function Install-StartupTask {
 }
 
 function Uninstall-StartupTask {
-    Unregister-ScheduledTask -TaskName (Get-StartupTaskName) -Confirm:$false
+    # Returns $true if a task was removed, $false if there was nothing to remove,
+    # so -Uninstall on a clean machine doesn't surface a scary error.
+    $taskName = Get-StartupTaskName
+    if (-not (Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue)) {
+        return $false
+    }
+    Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+    return $true
 }
 
 function Start-Headless {
@@ -115,8 +123,11 @@ function Start-Headless {
 }
 
 if ($Uninstall) {
-    Uninstall-StartupTask
-    Write-Host "Removed the '$(Get-StartupTaskName)' logon task."
+    if (Uninstall-StartupTask) {
+        Write-Host "Removed the '$(Get-StartupTaskName)' logon task."
+    } else {
+        Write-Host "No '$(Get-StartupTaskName)' logon task was installed; nothing to remove."
+    }
     exit 0
 }
 

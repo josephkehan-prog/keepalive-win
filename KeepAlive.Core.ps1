@@ -101,7 +101,9 @@ function Get-MicrosoftAppProcessNames {
 function Test-IsMicrosoftApp {
     param([string]$ProcessName)
     if ([string]::IsNullOrWhiteSpace($ProcessName)) { return $false }
-    $name = $ProcessName.Trim().ToLower()
+    # Invariant culture: a culture-sensitive ToLower() (e.g. Turkish 'I' -> dotless 'ı')
+    # would break matching for ASCII image names like VISIO/LYNC.
+    $name = $ProcessName.Trim().ToLowerInvariant()
     if ($name.EndsWith('.exe')) { $name = $name.Substring(0, $name.Length - 4) }
     return ($script:MicrosoftAppProcessNames -contains $name)
 }
