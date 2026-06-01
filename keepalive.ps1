@@ -322,10 +322,7 @@ if ($BrowserKeepAlive) {
 $mode              = if ($SystemOnly)       { " (display may sleep)" } else { "" }
 $appNudgeBlock     = if ($AllMicrosoftApps) { { Send-AppNudge } }     else { $null }
 $browserNudgeBlock = if ($BrowserKeepAlive) { { Send-BrowserNudge } } else { $null }
-$stopWhenBlock     = if ($WatchProcess)     {
-    $proc = $WatchProcess
-    { -not (Get-Process -Name $proc -ErrorAction SilentlyContinue) }.GetNewClosure()
-} else { $null }
+$stopWhenBlock     = if ($WatchProcess)     { { -not (Get-Process -Name $WatchProcess -ErrorAction SilentlyContinue) } } else { $null }
 
 Invoke-KeepAlive `
     -IntervalSeconds $IntervalSeconds `
