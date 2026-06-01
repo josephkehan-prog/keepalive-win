@@ -150,3 +150,175 @@ Describe 'Test-IsMicrosoftApp' {
         Test-IsMicrosoftApp -ProcessName '   ' | Should Be $false
     }
 }
+
+Describe 'Invoke-KeepAlive' {
+    It 'calls Enable at loop start' {
+        $script:enableCalled = $false
+        Invoke-KeepAlive `
+            -StopWhen { $true } `
+            -Enable   { $script:enableCalled = $true } `
+            -Restore {} -Clock { Get-Date } -Tick {}
+        $script:enableCalled | Should Be $true
+    }
+    It 'calls Restore in finally even when Enable throws' {
+        $script:restoreCalled = $false
+        try {
+            Invoke-KeepAlive `
+                -Enable  { throw 'simulated error' } `
+                -Restore { $script:restoreCalled = $true } `
+                -Clock { Get-Date } -Tick {}
+        } catch { }
+        $script:restoreCalled | Should Be $true
+    }
+    It 'calls Restore on normal exit' {
+        $script:restoreCalled = $false
+        Invoke-KeepAlive `
+            -StopWhen { $true } `
+            -Enable   {} `
+            -Restore  { $script:restoreCalled = $true } `
+            -Clock { Get-Date } -Tick {}
+        $script:restoreCalled | Should Be $true
+    }
+    It 'does not call Nudge when StopWhen stops the loop immediately' {
+        $script:nudgeCalled = $false
+        Invoke-KeepAlive `
+            -StopWhen { $true } `
+            -Nudge    { $script:nudgeCalled = $true } `
+            -Enable {} -Restore {} -Clock { Get-Date } -Tick {}
+        $script:nudgeCalled | Should Be $false
+    }
+    It 'calls Nudge once when loop runs one iteration before auto-stopping' {
+        $script:nudgeCount = 0
+        $script:clk = 0
+        Invoke-KeepAlive `
+            -Minutes 1 `
+            -Clock {
+                switch ($script:clk++) {
+                    0       { [datetime]'2026-01-01T12:00:00' }
+                    1       { [datetime]'2026-01-01T12:00:30' }
+                    default { [datetime]'2026-01-01T12:02:00' }
+                }
+            } `
+            -Nudge  { $script:nudgeCount++ } `
+            -Enable {} -Restore {} -Tick {}
+        $script:nudgeCount | Should Be 1
+    }
+    It 'does not throw when Quiet is set' {
+        $script:clk = 0
+        {
+            Invoke-KeepAlive -Quiet `
+                -StopWhen { $true } `
+                -Enable {} -Restore {} -Clock { Get-Date } -Tick {}
+        } | Should Not Throw
+    }
+    It 'does not call AppNudge when AppNudge is null' {
+        $script:appNudgeCalled = $false
+        Invoke-KeepAlive `
+            -StopWhen { $true } `
+            -AppNudge $null `
+            -Enable {} -Restore {} -Clock { Get-Date } -Tick {}
+        $script:appNudgeCalled | Should Be $false
+    }
+    It 'calls AppNudge when provided' {
+        $script:appNudgeCalled = $false
+        $script:clk = 0
+        Invoke-KeepAlive `
+            -Minutes 1 `
+            -Clock {
+                switch ($script:clk++) {
+                    0       { [datetime]'2026-01-01T12:00:00' }
+                    1       { [datetime]'2026-01-01T12:00:30' }
+                    default { [datetime]'2026-01-01T12:02:00' }
+                }
+            } `
+            -AppNudge { $script:appNudgeCalled = $true } `
+            -Enable {} -Restore {} -Nudge {} -Tick {}
+        $script:appNudgeCalled | Should Be $true
+    }
+}
+
+Describe 'Get-PidFilePath' {
+    It 'returns a path ending in keepalive.pid' {
+        (Get-PidFilePath) | Should Match 'keepalive\.pid$'
+    }
+    It 'returns a path under TEMP' {
+        (Get-PidFilePath).StartsWith($env:TEMP) | Should Be $true
+    }
+}
+
+Describe 'Read-ProfileConfig' {
+    It 'returns $null when the config file does not exist' {
+        Read-ProfileConfig -ConfigPath 'C:\nonexistent\keepalive.json' | Should Be $null
+    }
+    It 'returns $null for malformed JSON' {
+        $tmp = Join-Path $env:TEMP 'keepalive-bad.json'
+        Set-Content $tmp -Value 'NOT JSON' -Encoding UTF8
+        $result = Read-ProfileConfig -ConfigPath $tmp
+        Remove-Item $tmp -ErrorAction SilentlyContinue
+        $result | Should Be $null
+    }
+    It 'parses profiles from a valid config file' {
+        $tmp = Join-Path $env:TEMP 'keepalive-test.json'
+        Set-Content $tmp -Value '{"profiles":{"meeting":{"Minutes":120,"SystemOnly":true}}}' -Encoding UTF8
+        $result = Read-ProfileConfig -ConfigPath $tmp
+        Remove-Item $tmp -ErrorAction SilentlyContinue
+        $result | Should Not Be $null
+    }
+}
+
+Describe 'Get-ProfileSettings' {
+    $profiles = '{"meeting":{"Minutes":120},"focus":{"Quiet":true}}' | ConvertFrom-Json
+
+    It 'returns the settings for a known profile' {
+        $result = Get-ProfileSettings -Profiles $profiles -ProfileName 'meeting'
+        $result.Minutes | Should Be 120
+    }
+    It 'returns $null for an unknown profile name' {
+        Get-ProfileSettings -Profiles $profiles -ProfileName 'unknown' | Should Be $null
+    }
+    It 'returns $null when Profiles is $null' {
+        Get-ProfileSettings -Profiles $null -ProfileName 'meeting' | Should Be $null
+    }
+    It 'returns $null when ProfileName is empty' {
+        Get-ProfileSettings -Profiles $profiles -ProfileName '' | Should Be $null
+    }
+}
+
+Describe 'Test-IsM365Url' {
+    It 'matches Outlook web' {
+        Test-IsM365Url 'https://outlook.office365.com/mail/' | Should Be $true
+    }
+    It 'matches Teams web' {
+        Test-IsM365Url 'https://teams.microsoft.com/v2/' | Should Be $true
+    }
+    It 'matches SharePoint' {
+        Test-IsM365Url 'https://contoso.sharepoint.com/sites/hr' | Should Be $true
+    }
+    It 'matches Office.com' {
+        Test-IsM365Url 'https://www.office.com' | Should Be $true
+    }
+    It 'does not match non-M365 URLs' {
+        Test-IsM365Url 'https://google.com' | Should Be $false
+    }
+    It 'returns false for empty string' {
+        Test-IsM365Url '' | Should Be $false
+    }
+}
+
+Describe 'Select-M365Tabs' {
+    It 'returns only M365 tabs from a mixed list' {
+        $tabs = @(
+            [pscustomobject]@{ url = 'https://outlook.office365.com/mail/' },
+            [pscustomobject]@{ url = 'https://google.com' },
+            [pscustomobject]@{ url = 'https://contoso.sharepoint.com/sites/hr' }
+        )
+        (Select-M365Tabs -Tabs $tabs).Count | Should Be 2
+    }
+    It 'returns empty array for null input' {
+        (Select-M365Tabs -Tabs $null).Count | Should Be 0
+    }
+    It 'returns empty array when no tabs match M365 patterns' {
+        $tabs = @([pscustomobject]@{ url = 'https://github.com' })
+        (Select-M365Tabs -Tabs $tabs).Count | Should Be 0
+    }
+}

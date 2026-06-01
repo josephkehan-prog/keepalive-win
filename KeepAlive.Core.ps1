@@ -107,3 +107,109 @@ function Test-IsMicrosoftApp {
     if ($name.EndsWith('.exe')) { $name = $name.Substring(0, $name.Length - 4) }
     return ($script:MicrosoftAppProcessNames -contains $name)
 }
+
+# --- Run loop (injectable for testing) ----------------------------------------
+# All side-effecting operations (Win32 calls) are passed as script blocks so
+# the loop can be unit-tested without P/Invoke. -Tick defaults to Start-Sleep 1s;
+# pass {} in tests to skip real waiting. -Clock defaults to Get-Date; pass a
+# controlled clock to simulate time passage.
+
+function Invoke-KeepAlive {
+    param(
+        [int]$IntervalSeconds      = 60,
+        [int]$Minutes              = 0,
+        [switch]$Quiet,
+        [string]$ModeSuffix        = '',
+        [scriptblock]$Enable       = $null,
+        [scriptblock]$Restore      = $null,
+        [scriptblock]$Nudge        = $null,
+        [scriptblock]$AppNudge     = $null,
+        [scriptblock]$BrowserNudge = $null,
+        [scriptblock]$StopWhen     = $null,
+        [scriptblock]$Clock        = { Get-Date },
+        [scriptblock]$Tick         = $null
+    )
+    $start   = & $Clock
+    $endTime = Get-EndTime -Start $start -Minutes $Minutes
+    $banner  = if ($endTime) {
+        "Keeping awake$ModeSuffix until $($endTime.ToString('HH:mm:ss')). Press Ctrl+C to stop."
+    } else {
+        "Keeping awake$ModeSuffix. Press Ctrl+C to stop."
+    }
+    Write-Host $banner
+    try {
+        if ($Enable) { & $Enable }
+        while ($true) {
+            if (Test-ShouldStop -Now (& $Clock) -EndTime $endTime) { break }
+            if ($StopWhen -and (& $StopWhen))                      { break }
+            if ($Nudge)        { & $Nudge }
+            if ($AppNudge)     { & $AppNudge }
+            if ($BrowserNudge) { & $BrowserNudge }
+            if (-not $Quiet) {
+                Write-Host ("[{0}] awake - next nudge in {1}s" -f (& $Clock).ToString('HH:mm:ss'), $IntervalSeconds)
+            }
+            # Sleep in 1s slices so Ctrl+C and -Minutes stay responsive.
+            for ($i = 0; $i -lt $IntervalSeconds; $i++) {
+                if (Test-ShouldStop -Now (& $Clock) -EndTime $endTime) { break }
+                if ($StopWhen -and (& $StopWhen))                      { break }
+                if ($Tick) { & $Tick } else { Start-Sleep -Seconds 1 }
+            }
+        }
+    }
+    finally {
+        if ($Restore) { & $Restore }
+        Write-Host "Stopped - normal power behavior restored."
+    }
+}
+
+# --- PID file (headless process lifecycle) ------------------------------------
+
+function Get-PidFilePath {
+    return (Join-Path $env:TEMP 'keepalive.pid')
+}
+
+# --- Named profiles (keepalive.json) ------------------------------------------
+
+function Read-ProfileConfig {
+    param([string]$ConfigPath)
+    if (-not (Test-Path $ConfigPath)) { return $null }
+    try {
+        return (Get-Content $ConfigPath -Raw -ErrorAction Stop | ConvertFrom-Json).profiles
+    } catch { return $null }
+}
+
+function Get-ProfileSettings {
+    param([object]$Profiles, [string]$ProfileName)
+    if ($null -eq $Profiles -or [string]::IsNullOrWhiteSpace($ProfileName)) { return $null }
+    $prop = $Profiles.PSObject.Properties[$ProfileName]
+    if ($null -eq $prop) { return $null }
+    return $prop.Value
+}
+
+# --- Browser tab keep-alive (CDP) URL helpers ---------------------------------
+
+$script:M365UrlPatterns = @(
+    'outlook\.office',
+    'teams\.microsoft',
+    '\.sharepoint\.com',
+    '\.office\.com',
+    'onedrive\.live\.com',
+    '\.microsoftonline\.com'
+)
+
+function Get-M365UrlPatterns { return $script:M365UrlPatterns }
+
+function Test-IsM365Url {
+    param([string]$Url)
+    if ([string]::IsNullOrWhiteSpace($Url)) { return $false }
+    foreach ($pattern in $script:M365UrlPatterns) {
+        if ($Url -match $pattern) { return $true }
+    }
+    return $false
+}
+
+function Select-M365Tabs {
+    param([object[]]$Tabs)
+    if ($null -eq $Tabs) { return @() }
+    return @($Tabs | Where-Object { Test-IsM365Url -Url $_.url })
+}
