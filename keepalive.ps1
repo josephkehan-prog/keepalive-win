@@ -20,6 +20,11 @@
 .PARAMETER Quiet
     Suppress the periodic status line.
 
+.PARAMETER SystemOnly
+    Keep the machine awake from sleep but allow the display/monitor to turn off.
+    Prevents sleep/idle logout while still letting the screen power down. By default
+    both system sleep and display-off are blocked.
+
 .PARAMETER Install
     Register a "run at logon" scheduled task ('KeepAlive') that relaunches this CLI
     automatically, then exit. Any -IntervalSeconds / -Minutes / -Quiet flags given
@@ -53,6 +58,7 @@ param(
     [int]$IntervalSeconds = 60,
     [int]$Minutes = 0,
     [switch]$Quiet,
+    [switch]$SystemOnly,
     [switch]$Install,
     [switch]$Uninstall,
     [switch]$Headless
@@ -81,7 +87,7 @@ function Get-PwshPath {
 function Install-StartupTask {
     $taskName  = Get-StartupTaskName
     $arguments = Get-StartupArguments -ScriptPath $PSCommandPath `
-        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet:$Quiet -Hidden
+        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet:$Quiet -SystemOnly:$SystemOnly -Hidden
     $action   = New-ScheduledTaskAction -Execute (Get-PwshPath) -Argument $arguments
     $trigger  = New-ScheduledTaskTrigger -AtLogOn
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
@@ -96,7 +102,7 @@ function Uninstall-StartupTask {
 function Start-Headless {
     # Spawn a detached, hidden copy and let this foreground invocation return.
     $arguments = Get-StartupArguments -ScriptPath $PSCommandPath `
-        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet -Hidden
+        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet -SystemOnly:$SystemOnly -Hidden
     Start-Process -FilePath (Get-PwshPath) -ArgumentList $arguments -WindowStyle Hidden | Out-Null
 }
 
@@ -129,7 +135,7 @@ $VK_F15          = [byte]0x7E
 $KEYEVENTF_KEYUP = [uint32]0x2
 $ES_CONTINUOUS   = [uint32]2147483648
 
-function Enable-StayAwake { [void][KeepAlive.Native]::SetThreadExecutionState((Get-AwakeFlags)) }
+function Enable-StayAwake { [void][KeepAlive.Native]::SetThreadExecutionState((Get-AwakeFlags -KeepDisplayOn:(-not $SystemOnly))) }
 function Restore-Power    { [void][KeepAlive.Native]::SetThreadExecutionState($ES_CONTINUOUS) }
 function Send-Nudge {
     [KeepAlive.Native]::keybd_event($VK_F15, 0, 0, [UIntPtr]::Zero)
@@ -139,8 +145,9 @@ function Send-Nudge {
 $start   = Get-Date
 $endTime = Get-EndTime -Start $start -Minutes $Minutes
 
-$banner = if ($endTime) { "Keeping awake until $($endTime.ToString('HH:mm:ss')). Press Ctrl+C to stop." }
-          else          { "Keeping awake. Press Ctrl+C to stop." }
+$mode   = if ($SystemOnly) { " (display may sleep)" } else { "" }
+$banner = if ($endTime) { "Keeping awake$mode until $($endTime.ToString('HH:mm:ss')). Press Ctrl+C to stop." }
+          else          { "Keeping awake$mode. Press Ctrl+C to stop." }
 Write-Host $banner
 
 try {

@@ -16,11 +16,22 @@ function Get-EndTime {
 }
 
 function Get-AwakeFlags {
-    # ES_CONTINUOUS (0x80000000) | ES_SYSTEM_REQUIRED (0x1) | ES_DISPLAY_REQUIRED (0x2)
+    # Composes the SetThreadExecutionState bitmask that keeps Windows awake.
+    # ES_CONTINUOUS (0x80000000) is always set so the state persists across the run.
+    # ES_SYSTEM_REQUIRED (0x1) blocks system sleep; ES_DISPLAY_REQUIRED (0x2) blocks
+    # display-off. Default keeps both; clearing KeepDisplayOn lets the monitor sleep
+    # while the machine itself stays awake (avoids sleep/idle logout, saves the screen).
+    param(
+        [bool]$KeepSystemAwake = $true,
+        [bool]$KeepDisplayOn   = $true
+    )
     $ES_CONTINUOUS       = [uint32]2147483648
     $ES_SYSTEM_REQUIRED  = [uint32]1
     $ES_DISPLAY_REQUIRED = [uint32]2
-    return [uint32]($ES_CONTINUOUS -bor $ES_SYSTEM_REQUIRED -bor $ES_DISPLAY_REQUIRED)
+    $flags = $ES_CONTINUOUS
+    if ($KeepSystemAwake) { $flags = $flags -bor $ES_SYSTEM_REQUIRED }
+    if ($KeepDisplayOn)   { $flags = $flags -bor $ES_DISPLAY_REQUIRED }
+    return [uint32]$flags
 }
 
 function Test-ShouldStop {
@@ -46,6 +57,7 @@ function Get-StartupArguments {
         [int]$IntervalSeconds = 60,
         [int]$Minutes = 0,
         [switch]$Quiet,
+        [switch]$SystemOnly,
         [switch]$Hidden
     )
     $parts = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
@@ -54,5 +66,6 @@ function Get-StartupArguments {
     if ($IntervalSeconds -ne 60) { $parts += @('-IntervalSeconds', $IntervalSeconds) }
     if ($Minutes -ne 0)          { $parts += @('-Minutes', $Minutes) }
     if ($Quiet)                  { $parts += '-Quiet' }
+    if ($SystemOnly)             { $parts += '-SystemOnly' }
     return ($parts -join ' ')
 }

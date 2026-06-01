@@ -6,7 +6,8 @@ A zero-dependency Windows PowerShell CLI that keeps your machine awake so M365 w
 ## How it works
 
 While running, it:
-- blocks system sleep + display-off via `SetThreadExecutionState`, and
+- blocks system sleep + display-off via `SetThreadExecutionState` (use `-SystemOnly` to keep
+  the machine awake while still letting the monitor turn off), and
 - sends a harmless **F15** keypress every *N* seconds to reset the Windows idle timer
   (`GetLastInputInfo`), which is what drives screen-lock and most app/tab idle detection.
 
@@ -18,6 +19,7 @@ On exit it always restores normal power behavior (`try/finally`).
 keepalive                      # stay awake until Ctrl+C
 keepalive -Minutes 90 -Quiet   # stay awake 90 minutes, no status output
 keepalive -IntervalSeconds 30  # nudge every 30s (minimum 10)
+keepalive -SystemOnly          # keep the machine awake but let the display sleep
 keepalive -Headless            # run detached in the background, then close the terminal
 keepalive -Install -Quiet      # auto-start at every logon (see below)
 keepalive -Uninstall           # remove the logon auto-start
@@ -49,7 +51,7 @@ M365 idle session timeout that keys off browser-tab interaction. For that case, 
 |---|---|
 | `keepalive.ps1` | The CLI (param block + Win32 P/Invoke + run loop + install/headless launch) |
 | `KeepAlive.Core.ps1` | Pure, testable logic (interval validation, end-time math, flag/stop logic, relaunch-arg building) |
-| `KeepAlive.Tests.ps1` | Pester tests (22 tests, 100% core coverage) |
+| `KeepAlive.Tests.ps1` | Pester tests (26 tests, 100% core coverage) |
 | `keepalive.cmd` | Double-click / `keepalive` launcher |
 | `plans/` | Construction blueprint, including the optional browser keep-alive step |
 

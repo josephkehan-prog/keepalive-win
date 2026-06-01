@@ -33,12 +33,23 @@ Describe 'Get-EndTime' {
 }
 
 Describe 'Get-AwakeFlags' {
-    It 'composes ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED as 0x80000003' {
+    It 'composes ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED as 0x80000003 by default' {
         # 0x80000000 | 0x1 | 0x2 = 2147483651, must survive as an unsigned 32-bit value
         Get-AwakeFlags | Should Be ([uint32]2147483651)
     }
     It 'returns a uint32 (not a sign-flipped negative int)' {
         (Get-AwakeFlags) -gt 0 | Should Be $true
+    }
+    It 'keeps the system awake but lets the display sleep (0x80000001)' {
+        # ES_CONTINUOUS | ES_SYSTEM_REQUIRED = 2147483649
+        Get-AwakeFlags -KeepDisplayOn $false | Should Be ([uint32]2147483649)
+    }
+    It 'keeps the display on but lets the system sleep (0x80000002)' {
+        # ES_CONTINUOUS | ES_DISPLAY_REQUIRED = 2147483650
+        Get-AwakeFlags -KeepSystemAwake $false | Should Be ([uint32]2147483650)
+    }
+    It 'returns just ES_CONTINUOUS when both are cleared (0x80000000)' {
+        Get-AwakeFlags -KeepSystemAwake $false -KeepDisplayOn $false | Should Be ([uint32]2147483648)
     }
 }
 
@@ -96,8 +107,12 @@ Describe 'Get-StartupArguments' {
         Get-StartupArguments -ScriptPath $path -Hidden |
             Should Be '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Tools\keepalive.ps1"'
     }
+    It 'appends -SystemOnly when requested' {
+        Get-StartupArguments -ScriptPath $path -SystemOnly |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1" -SystemOnly'
+    }
     It 'composes every option in launcher-then-script order' {
-        Get-StartupArguments -ScriptPath $path -IntervalSeconds 30 -Minutes 90 -Quiet -Hidden |
-            Should Be '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Tools\keepalive.ps1" -IntervalSeconds 30 -Minutes 90 -Quiet'
+        Get-StartupArguments -ScriptPath $path -IntervalSeconds 30 -Minutes 90 -Quiet -SystemOnly -Hidden |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Tools\keepalive.ps1" -IntervalSeconds 30 -Minutes 90 -Quiet -SystemOnly'
     }
 }
