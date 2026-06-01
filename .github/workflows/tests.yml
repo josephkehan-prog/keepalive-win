@@ -53,29 +53,35 @@ jobs:
           Install-Module -Name PSScriptAnalyzer -Force -SkipPublisherCheck -Scope CurrentUser
 
       - name: Run PSScriptAnalyzer
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          GH_REPO: ${{ github.repository }}
         shell: pwsh
         run: |
           $results = Invoke-ScriptAnalyzer `
             -Path .\keepalive.ps1, .\KeepAlive.Core.ps1 `
             -Settings .\PSScriptAnalyzerSettings.psd1
-          # Always dump all results for diagnostics
-          Write-Host "=== All PSScriptAnalyzer results ($($results.Count) total) ==="
-          if ($results) { $results | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize }
+          # Dump all results to stdout
+          Write-Host "=== PSScriptAnalyzer: $($results.Count) result(s) ==="
+          if ($results) { $results | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize | Out-String | Write-Host }
           else { Write-Host "(none)" }
-          $issues = $results | Where-Object { $_.Severity -in @('Error', 'Warning') }
-          if ($issues) {
-            $table = ($issues | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize | Out-String).Trim()
-            # Post as a PR comment so the failures are visible via GitHub API
-            if ($env:PR_NUMBER -and $env:GH_TOKEN) {
-              $body = @{ body = "**PSScriptAnalyzer failures ($($issues.Count)):**`n``````text`n$table`n``````" } | ConvertTo-Json
-              $headers = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
-              Invoke-RestMethod -Uri "https://api.github.com/repos/$env:GH_REPO/issues/$env:PR_NUMBER/comments" `
-                -Method Post -Body $body -Headers $headers -ContentType 'application/json' -ErrorAction SilentlyContinue
+          # Emit GitHub Actions annotations so findings are visible in the check-run UI
+          foreach ($r in $results) {
+            $f = $r.ScriptName; $l = $r.Line; $m = "[$($r.RuleName)] $($r.Message)"
+            switch ($r.Severity) {
+              'Error'   { Write-Host "::error   file=$f,line=$l::$m" }
+              'Warning' { Write-Host "::warning file=$f,line=$l::$m" }
+              default   { Write-Host "::notice  file=$f,line=$l::$m" }
             }
-            throw "$($issues.Count) PSScriptAnalyzer issue(s) found."
           }
+          # Write step summary so findings appear in the Actions job detail page
+          $sum = $env:GITHUB_STEP_SUMMARY
+          if ($sum) {
+            "## PSScriptAnalyzer ($($results.Count) result(s))`n" | Out-File -Append $sum -Encoding UTF8
+            if ($results) {
+              "| Severity | Rule | File | Line | Message |`n|---|---|---|---|---|" | Out-File -Append $sum -Encoding UTF8
+              foreach ($r in $results) {
+                "| $($r.Severity) | ``$($r.RuleName)`` | $($r.ScriptName) | $($r.Line) | $($r.Message) |" | Out-File -Append $sum -Encoding UTF8
+              }
+            } else { "No findings." | Out-File -Append $sum -Encoding UTF8 }
+          }
+          $issues = $results | Where-Object { $_.Severity -in @('Error', 'Warning') }
+          if ($issues) { throw "$($issues.Count) PSScriptAnalyzer issue(s) found." }
           Write-Host "PSScriptAnalyzer: no issues."
