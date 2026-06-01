@@ -1,27 +1,31 @@
 @{
-    # Whitelist approach: only run rules we have positively verified pass for this codebase.
-    # These catch real bugs (wrong automatic variables, redefining built-ins, unapproved verbs,
-    # global variable leaks, dangerous cmdlets, bad null comparisons, bad switch defaults)
-    # without generating false positives for the intentional patterns in keepalive.ps1 /
-    # KeepAlive.Core.ps1 (Write-Host CLI output, empty catch for fault isolation, positional
-    # params for common cmdlets, 2>$null stream suppression, script-scope constants, etc.).
-    IncludeRules = @(
-        # Catches accidental assignment to $true, $false, $null, $PID, etc.
-        'PSAvoidAssignmentToAutomaticVariable',
-        # Catches redefining built-in cmdlets like Write-Output, Get-Item, etc.
-        'PSAvoidOverwritingBuiltInCmdlets',
-        # All function verbs (Get, Test, Invoke, Read, Select, Send, Enable, Restore,
-        # Install, Uninstall, Start, Stop, Get) are in the approved list.
-        'PSUseApprovedVerbs',
-        # Scripts use $script: scope throughout; no $global: variables exist.
-        'PSAvoidGlobalVars',
-        # Invoke-Expression is not used anywhere in the codebase.
-        'PSAvoidUsingInvokeExpression',
-        # ConvertTo-SecureString with plain text is not used.
-        'PSAvoidUsingConvertToSecureStringWithPlainText',
-        # All null comparisons use $null on the left ($null -eq $x), which is correct.
-        'PSPossibleIncorrectComparisonWithNull',
-        # All [switch] parameters default to $false (no explicit non-false default).
-        'PSAvoidDefaultValueSwitchParameter'
+    ExcludeRules = @(
+        # Intentional: keepalive.ps1 is a user-facing CLI; Write-Host is the right tool.
+        'PSAvoidUsingWriteHost',
+        # Intentional: these are scripts, not modules. ShouldProcess is for module cmdlets.
+        'PSUseShouldProcessForStateChangingFunctions',
+        # Intentional: Send-BrowserNudge always targets the local CDP port; localhost is correct.
+        'PSAvoidUsingComputerNameHardcoded',
+        # Intentional: per-window/per-tab PostMessage and WebSocket failures are silently swallowed
+        # so that a single failing app or closing tab never breaks the keep-alive loop.
+        'PSAvoidUsingEmptyCatchBlock',
+        # Intentional: positional parameters are used conventionally for common cmdlets
+        # (Write-Host, Test-Path, Get-Content, Remove-Item, Invoke-RestMethod) following
+        # standard PowerShell idiom; explicit -Object/-Path/-Uri adds noise without clarity.
+        'PSAvoidUsingPositionalParameters',
+        # Intentional: script-scope constants (Win32 flags, P/Invoke values) are defined at
+        # script scope for readability and used inside nested function definitions in the same
+        # file. PSScriptAnalyzer does not always track cross-scope usage within a single script.
+        'PSUseDeclaredVarsMoreThanAssignments',
+        # Intentional: UTF-8 without BOM is the standard encoding for PowerShell scripts on
+        # modern toolchains; adding a BOM would break compatibility with some editors and tools.
+        'PSUseBOMForUnicodeEncodedFile',
+        # Intentional: 2>$null is used to suppress Test-NetConnection's verbose output.
+        # PSScriptAnalyzer may mis-classify stream-2 redirection as a potential comparison.
+        'PSPossibleIncorrectUsageOfRedirectionOperator',
+        # Intentional: script-level parameters are referenced in nested function bodies
+        # (Install-StartupTask, Start-Headless, Enable-StayAwake) which PSScriptAnalyzer
+        # may not count as usages when checking the script-level param block.
+        'PSReviewUnusedParameter'
     )
 }

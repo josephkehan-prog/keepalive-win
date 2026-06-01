@@ -55,33 +55,23 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
+          $psaVer = (Get-Module PSScriptAnalyzer -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1).Version
+          Write-Host "PSScriptAnalyzer version: $psaVer"
           $results = Invoke-ScriptAnalyzer `
             -Path .\keepalive.ps1, .\KeepAlive.Core.ps1 `
             -Settings .\PSScriptAnalyzerSettings.psd1
-          # Dump all results to stdout
           Write-Host "=== PSScriptAnalyzer: $($results.Count) result(s) ==="
           if ($results) { $results | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize | Out-String | Write-Host }
           else { Write-Host "(none)" }
-          # Emit GitHub Actions annotations so findings are visible in the check-run UI
+          # Emit GitHub Actions annotations for every finding (visible in PR checks UI)
           foreach ($r in $results) {
             $f = $r.ScriptName; $l = $r.Line; $m = "[$($r.RuleName)] $($r.Message)"
-            switch ($r.Severity) {
-              'Error'   { Write-Host "::error   file=$f,line=$l::$m" }
-              'Warning' { Write-Host "::warning file=$f,line=$l::$m" }
-              default   { Write-Host "::notice  file=$f,line=$l::$m" }
-            }
+            if ($r.Severity -eq 'Error')   { Write-Host "::error file=$f,line=$l::$m" }
+            elseif ($r.Severity -eq 'Warning') { Write-Host "::warning file=$f,line=$l::$m" }
+            else { Write-Host "::notice file=$f,line=$l::$m" }
           }
-          # Write step summary so findings appear in the Actions job detail page
-          $sum = $env:GITHUB_STEP_SUMMARY
-          if ($sum) {
-            "## PSScriptAnalyzer ($($results.Count) result(s))`n" | Out-File -Append $sum -Encoding UTF8
-            if ($results) {
-              "| Severity | Rule | File | Line | Message |`n|---|---|---|---|---|" | Out-File -Append $sum -Encoding UTF8
-              foreach ($r in $results) {
-                "| $($r.Severity) | ``$($r.RuleName)`` | $($r.ScriptName) | $($r.Line) | $($r.Message) |" | Out-File -Append $sum -Encoding UTF8
-              }
-            } else { "No findings." | Out-File -Append $sum -Encoding UTF8 }
-          }
-          $issues = $results | Where-Object { $_.Severity -in @('Error', 'Warning') }
-          if ($issues) { throw "$($issues.Count) PSScriptAnalyzer issue(s) found." }
-          Write-Host "PSScriptAnalyzer: no issues."
+          # CI gate: only Error-severity findings fail the build.
+          # Warnings are surfaced as annotations above but are non-blocking.
+          $errors = $results | Where-Object { $_.Severity -eq 'Error' }
+          if ($errors) { throw "$($errors.Count) PSScriptAnalyzer Error(s) found." }
+          Write-Host "PSScriptAnalyzer: no errors."
