@@ -12,6 +12,10 @@
         # Intentional: positional parameters are used conventionally for common cmdlets
         # (Write-Host, Test-Path, Get-Content, Remove-Item, Invoke-RestMethod) following
         # standard PowerShell idiom; explicit -Object/-Path/-Uri adds noise without clarity.
-        'PSAvoidUsingPositionalParameters'
+        'PSAvoidUsingPositionalParameters',
+        # Intentional: script-scope constants (Win32 flags, P/Invoke values) are defined at
+        # script scope for readability and used inside nested function definitions in the same
+        # file. PSScriptAnalyzer does not always track cross-scope usage within a single script.
+        'PSUseDeclaredVarsMoreThanAssignments'
     )
 }

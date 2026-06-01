@@ -262,16 +262,13 @@ public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, System
 public static extern System.IntPtr PostMessage(System.IntPtr hWnd, uint Msg, System.IntPtr wParam, System.IntPtr lParam);
 '@
 
-$VK_F15          = [byte]0x7E
-$KEYEVENTF_KEYUP = [uint32]0x2
-$ES_CONTINUOUS   = [uint32]2147483648
-$WM_NULL         = [uint32]0x0000
-
 function Enable-StayAwake { [void][KeepAlive.Native]::SetThreadExecutionState((Get-AwakeFlags -KeepDisplayOn:(-not $SystemOnly))) }
-function Restore-Power    { [void][KeepAlive.Native]::SetThreadExecutionState($ES_CONTINUOUS) }
+function Restore-Power {
+    [void][KeepAlive.Native]::SetThreadExecutionState([uint32]2147483648)
+}
 function Send-Nudge {
-    [KeepAlive.Native]::keybd_event($VK_F15, 0, 0, [UIntPtr]::Zero)
-    [KeepAlive.Native]::keybd_event($VK_F15, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+    [KeepAlive.Native]::keybd_event([byte]0x7E, 0, 0, [UIntPtr]::Zero)
+    [KeepAlive.Native]::keybd_event([byte]0x7E, 0, [uint32]0x2, [UIntPtr]::Zero)
 }
 function Send-AppNudge {
     # Post WM_NULL to each Microsoft app's main window — async, never steals focus.
@@ -279,7 +276,7 @@ function Send-AppNudge {
         if (-not (Test-IsMicrosoftApp -ProcessName $proc.ProcessName)) { continue }
         $hWnd = $proc.MainWindowHandle
         if ($hWnd -ne [IntPtr]::Zero) {
-            try { [void][KeepAlive.Native]::PostMessage($hWnd, $WM_NULL, [IntPtr]::Zero, [IntPtr]::Zero) } catch { }
+            try { [void][KeepAlive.Native]::PostMessage($hWnd, [uint32]0x0000, [IntPtr]::Zero, [IntPtr]::Zero) } catch { }
         }
     }
 }
