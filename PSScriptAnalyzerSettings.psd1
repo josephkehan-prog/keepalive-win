@@ -16,6 +16,9 @@
         # Intentional: script-scope constants (Win32 flags, P/Invoke values) are defined at
         # script scope for readability and used inside nested function definitions in the same
         # file. PSScriptAnalyzer does not always track cross-scope usage within a single script.
-        'PSUseDeclaredVarsMoreThanAssignments'
+        'PSUseDeclaredVarsMoreThanAssignments',
+        # Intentional: UTF-8 without BOM is the standard encoding for PowerShell scripts on
+        # modern toolchains; adding a BOM would break compatibility with some editors and tools.
+        'PSUseBOMForUnicodeEncodedFile'
     )
 }

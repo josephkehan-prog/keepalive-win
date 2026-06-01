@@ -271,7 +271,7 @@ function Send-Nudge {
     [KeepAlive.Native]::keybd_event([byte]0x7E, 0, [uint32]0x2, [UIntPtr]::Zero)
 }
 function Send-AppNudge {
-    # Post WM_NULL to each Microsoft app's main window — async, never steals focus.
+    # Post WM_NULL to each Microsoft app's main window - async, never steals focus.
     foreach ($proc in Get-Process -ErrorAction SilentlyContinue) {
         if (-not (Test-IsMicrosoftApp -ProcessName $proc.ProcessName)) { continue }
         $hWnd = $proc.MainWindowHandle

@@ -1,4 +1,4 @@
-# KeepAlive.Core.ps1 — pure, testable logic for the keepalive CLI.
+# KeepAlive.Core.ps1 - pure, testable logic for the keepalive CLI.
 # No side effects here; the Win32 calls live in keepalive.ps1.
 
 # Minimum interval guard: anything faster than this is pointless thrash.
@@ -47,7 +47,7 @@ function Get-StartupTaskName {
     return $script:StartupTaskName
 }
 
-# Builds the pwsh argument string used to relaunch this CLI — for the run-at-logon
+# Builds the pwsh argument string used to relaunch this CLI - for the run-at-logon
 # task (-Install) and for the detached -Headless launch. Pure string assembly so it
 # can be unit-tested without touching Task Scheduler or spawning a process.
 # Only non-default flags are emitted, so a plain relaunch stays minimal.
@@ -101,7 +101,7 @@ function Get-MicrosoftAppProcessNames {
 function Test-IsMicrosoftApp {
     param([string]$ProcessName)
     if ([string]::IsNullOrWhiteSpace($ProcessName)) { return $false }
-    # Invariant culture: a culture-sensitive ToLower() (e.g. Turkish 'I' -> dotless 'ı')
+    # Invariant culture: a culture-sensitive ToLower() (e.g. Turkish 'I' -> dotless i)
     # would break matching for ASCII image names like VISIO/LYNC.
     $name = $ProcessName.Trim().ToLowerInvariant()
     if ($name.EndsWith('.exe')) { $name = $name.Substring(0, $name.Length - 4) }
