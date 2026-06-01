@@ -55,23 +55,35 @@ jobs:
       - name: Run PSScriptAnalyzer
         shell: pwsh
         run: |
+          # GitHub Actions sets $ErrorActionPreference = 'Stop' for pwsh steps,
+          # which would promote non-terminating Invoke-ScriptAnalyzer errors to fatal.
+          # We manage failures explicitly via the gate below, so set to Continue.
+          $ErrorActionPreference = 'Continue'
           $psaVer = (Get-Module PSScriptAnalyzer -ListAvailable | Sort-Object Version -Descending | Select-Object -First 1).Version
           Write-Host "PSScriptAnalyzer version: $psaVer"
-          $results = Invoke-ScriptAnalyzer `
-            -Path .\keepalive.ps1, .\KeepAlive.Core.ps1 `
-            -Settings .\PSScriptAnalyzerSettings.psd1
+          try {
+            $results = Invoke-ScriptAnalyzer `
+              -Path .\keepalive.ps1, .\KeepAlive.Core.ps1 `
+              -Settings .\PSScriptAnalyzerSettings.psd1 `
+              -ErrorAction Continue
+          } catch {
+            Write-Host "::error::Invoke-ScriptAnalyzer threw: $_"
+            throw
+          }
           Write-Host "=== PSScriptAnalyzer: $($results.Count) result(s) ==="
           if ($results) { $results | Format-Table ScriptName, Line, Severity, RuleName, Message -AutoSize | Out-String | Write-Host }
           else { Write-Host "(none)" }
-          # Emit GitHub Actions annotations for every finding (visible in PR checks UI)
+          # Emit GitHub Actions annotations for every finding
           foreach ($r in $results) {
             $f = $r.ScriptName; $l = $r.Line; $m = "[$($r.RuleName)] $($r.Message)"
-            if ($r.Severity -eq 'Error')   { Write-Host "::error file=$f,line=$l::$m" }
+            if ($r.Severity -eq 'Error')       { Write-Host "::error file=$f,line=$l::$m" }
             elseif ($r.Severity -eq 'Warning') { Write-Host "::warning file=$f,line=$l::$m" }
-            else { Write-Host "::notice file=$f,line=$l::$m" }
+            else                               { Write-Host "::notice file=$f,line=$l::$m" }
           }
-          # CI gate: only Error-severity findings fail the build.
-          # Warnings are surfaced as annotations above but are non-blocking.
+          # Gate: only Error-severity findings fail the build.
           $errors = $results | Where-Object { $_.Severity -eq 'Error' }
-          if ($errors) { throw "$($errors.Count) PSScriptAnalyzer Error(s) found." }
+          if ($errors) {
+            $ErrorActionPreference = 'Stop'
+            throw "$($errors.Count) PSScriptAnalyzer Error(s) found."
+          }
           Write-Host "PSScriptAnalyzer: no errors."
