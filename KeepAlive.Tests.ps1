@@ -111,8 +111,42 @@ Describe 'Get-StartupArguments' {
         Get-StartupArguments -ScriptPath $path -SystemOnly |
             Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1" -SystemOnly'
     }
+    It 'appends -AllMicrosoftApps when requested' {
+        Get-StartupArguments -ScriptPath $path -AllMicrosoftApps |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -File "C:\Tools\keepalive.ps1" -AllMicrosoftApps'
+    }
     It 'composes every option in launcher-then-script order' {
-        Get-StartupArguments -ScriptPath $path -IntervalSeconds 30 -Minutes 90 -Quiet -SystemOnly -Hidden |
-            Should Be '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Tools\keepalive.ps1" -IntervalSeconds 30 -Minutes 90 -Quiet -SystemOnly'
+        Get-StartupArguments -ScriptPath $path -IntervalSeconds 30 -Minutes 90 -Quiet -SystemOnly -AllMicrosoftApps -Hidden |
+            Should Be '-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "C:\Tools\keepalive.ps1" -IntervalSeconds 30 -Minutes 90 -Quiet -SystemOnly -AllMicrosoftApps'
+    }
+}
+
+Describe 'Get-MicrosoftAppProcessNames' {
+    It 'returns a non-empty list of targeted Microsoft app process names' {
+        (Get-MicrosoftAppProcessNames).Count -gt 0 | Should Be $true
+    }
+    It 'includes the core M365 desktop apps' {
+        $names = Get-MicrosoftAppProcessNames
+        $names -contains 'outlook' | Should Be $true
+        $names -contains 'teams'   | Should Be $true
+        $names -contains 'excel'   | Should Be $true
+    }
+}
+
+Describe 'Test-IsMicrosoftApp' {
+    It 'matches a known app regardless of case' {
+        Test-IsMicrosoftApp -ProcessName 'OUTLOOK' | Should Be $true
+    }
+    It 'tolerates an .exe suffix' {
+        Test-IsMicrosoftApp -ProcessName 'WINWORD.EXE' | Should Be $true
+    }
+    It 'matches the new Teams client name (ms-teams)' {
+        Test-IsMicrosoftApp -ProcessName 'ms-teams' | Should Be $true
+    }
+    It 'rejects a non-Microsoft process' {
+        Test-IsMicrosoftApp -ProcessName 'notepad' | Should Be $false
+    }
+    It 'rejects empty or whitespace input' {
+        Test-IsMicrosoftApp -ProcessName '   ' | Should Be $false
     }
 }

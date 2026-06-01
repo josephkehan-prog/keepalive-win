@@ -11,6 +11,10 @@ While running, it:
 - sends a harmless **F15** keypress every *N* seconds to reset the Windows idle timer
   (`GetLastInputInfo`), which is what drives screen-lock and most app/tab idle detection.
 
+With `-AllMicrosoftApps` it additionally posts a harmless no-op window message (`WM_NULL`) to
+each running Microsoft desktop app (Outlook, Teams, Word, Excel, OneNote, Edge, …) every
+interval, so they stay non-idle even when minimized or in the background. It never steals focus.
+
 On exit it always restores normal power behavior (`try/finally`).
 
 ## Usage
@@ -20,6 +24,7 @@ keepalive                      # stay awake until Ctrl+C
 keepalive -Minutes 90 -Quiet   # stay awake 90 minutes, no status output
 keepalive -IntervalSeconds 30  # nudge every 30s (minimum 10)
 keepalive -SystemOnly          # keep the machine awake but let the display sleep
+keepalive -AllMicrosoftApps    # also keep Outlook/Teams/Office/Edge non-idle when backgrounded
 keepalive -Headless            # run detached in the background, then close the terminal
 keepalive -Install -Quiet      # auto-start at every logon (see below)
 keepalive -Uninstall           # remove the logon auto-start
@@ -51,7 +56,7 @@ M365 idle session timeout that keys off browser-tab interaction. For that case, 
 |---|---|
 | `keepalive.ps1` | The CLI (param block + Win32 P/Invoke + run loop + install/headless launch) |
 | `KeepAlive.Core.ps1` | Pure, testable logic (interval validation, end-time math, flag/stop logic, relaunch-arg building) |
-| `KeepAlive.Tests.ps1` | Pester tests (26 tests, 100% core coverage) |
+| `KeepAlive.Tests.ps1` | Pester tests (34 tests, 100% core coverage) |
 | `keepalive.cmd` | Double-click / `keepalive` launcher |
 | `plans/` | Construction blueprint, including the optional browser keep-alive step |
 

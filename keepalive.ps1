@@ -37,6 +37,11 @@
     Relaunch this CLI in a hidden, detached background process and return immediately,
     so you can close the terminal and keep the machine awake. Implies -Quiet.
 
+.PARAMETER AllMicrosoftApps
+    Also keep running Microsoft desktop apps (Outlook, Teams, Word, Excel, OneNote,
+    Edge, etc.) non-idle even when they are minimized/backgrounded, by posting a
+    harmless no-op window message to each one every interval. Does not steal focus.
+
 .EXAMPLE
     pwsh -File .\keepalive.ps1
     Keeps awake until you press Ctrl+C.
@@ -59,6 +64,7 @@ param(
     [int]$Minutes = 0,
     [switch]$Quiet,
     [switch]$SystemOnly,
+    [switch]$AllMicrosoftApps,
     [switch]$Install,
     [switch]$Uninstall,
     [switch]$Headless
@@ -87,7 +93,8 @@ function Get-PwshPath {
 function Install-StartupTask {
     $taskName  = Get-StartupTaskName
     $arguments = Get-StartupArguments -ScriptPath $PSCommandPath `
-        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet:$Quiet -SystemOnly:$SystemOnly -Hidden
+        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet:$Quiet `
+        -SystemOnly:$SystemOnly -AllMicrosoftApps:$AllMicrosoftApps -Hidden
     $action   = New-ScheduledTaskAction -Execute (Get-PwshPath) -Argument $arguments
     $trigger  = New-ScheduledTaskTrigger -AtLogOn
     $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
@@ -102,7 +109,8 @@ function Uninstall-StartupTask {
 function Start-Headless {
     # Spawn a detached, hidden copy and let this foreground invocation return.
     $arguments = Get-StartupArguments -ScriptPath $PSCommandPath `
-        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet -SystemOnly:$SystemOnly -Hidden
+        -IntervalSeconds $IntervalSeconds -Minutes $Minutes -Quiet `
+        -SystemOnly:$SystemOnly -AllMicrosoftApps:$AllMicrosoftApps -Hidden
     Start-Process -FilePath (Get-PwshPath) -ArgumentList $arguments -WindowStyle Hidden | Out-Null
 }
 
@@ -129,17 +137,32 @@ Add-Type -Namespace KeepAlive -Name Native -MemberDefinition @'
 public static extern uint SetThreadExecutionState(uint esFlags);
 [DllImport("user32.dll")]
 public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, System.UIntPtr dwExtraInfo);
+[DllImport("user32.dll")]
+public static extern System.IntPtr PostMessage(System.IntPtr hWnd, uint Msg, System.IntPtr wParam, System.IntPtr lParam);
 '@
 
 $VK_F15          = [byte]0x7E
 $KEYEVENTF_KEYUP = [uint32]0x2
 $ES_CONTINUOUS   = [uint32]2147483648
+$WM_NULL         = [uint32]0x0000
 
 function Enable-StayAwake { [void][KeepAlive.Native]::SetThreadExecutionState((Get-AwakeFlags -KeepDisplayOn:(-not $SystemOnly))) }
 function Restore-Power    { [void][KeepAlive.Native]::SetThreadExecutionState($ES_CONTINUOUS) }
 function Send-Nudge {
     [KeepAlive.Native]::keybd_event($VK_F15, 0, 0, [UIntPtr]::Zero)
     [KeepAlive.Native]::keybd_event($VK_F15, 0, $KEYEVENTF_KEYUP, [UIntPtr]::Zero)
+}
+function Send-AppNudge {
+    # Post a harmless no-op (WM_NULL) to each running Microsoft app's main window so
+    # it stays non-idle even when backgrounded. PostMessage is async and never steals
+    # focus. Per-window failures are ignored so one closing app can't break the loop.
+    foreach ($proc in Get-Process -ErrorAction SilentlyContinue) {
+        if (-not (Test-IsMicrosoftApp -ProcessName $proc.ProcessName)) { continue }
+        $hWnd = $proc.MainWindowHandle
+        if ($hWnd -ne [IntPtr]::Zero) {
+            try { [void][KeepAlive.Native]::PostMessage($hWnd, $WM_NULL, [IntPtr]::Zero, [IntPtr]::Zero) } catch { }
+        }
+    }
 }
 
 $start   = Get-Date
@@ -155,6 +178,7 @@ try {
     while ($true) {
         if (Test-ShouldStop -Now (Get-Date) -EndTime $endTime) { break }
         Send-Nudge
+        if ($AllMicrosoftApps) { Send-AppNudge }
         if (-not $Quiet) {
             Write-Host ("[{0}] awake - next nudge in {1}s" -f (Get-Date).ToString('HH:mm:ss'), $IntervalSeconds)
         }

@@ -58,6 +58,7 @@ function Get-StartupArguments {
         [int]$Minutes = 0,
         [switch]$Quiet,
         [switch]$SystemOnly,
+        [switch]$AllMicrosoftApps,
         [switch]$Hidden
     )
     $parts = @('-NoProfile', '-ExecutionPolicy', 'Bypass')
@@ -67,5 +68,40 @@ function Get-StartupArguments {
     if ($Minutes -ne 0)          { $parts += @('-Minutes', $Minutes) }
     if ($Quiet)                  { $parts += '-Quiet' }
     if ($SystemOnly)             { $parts += '-SystemOnly' }
+    if ($AllMicrosoftApps)       { $parts += '-AllMicrosoftApps' }
     return ($parts -join ' ')
+}
+
+# Microsoft desktop apps that -AllMicrosoftApps nudges per-window so they stay
+# non-idle even when backgrounded. Process names are lowercase, without ".exe".
+$script:MicrosoftAppProcessNames = @(
+    'outlook',   # Outlook
+    'teams',     # Teams (classic client)
+    'ms-teams',  # Teams (new client)
+    'onenote',   # OneNote
+    'winword',   # Word
+    'excel',     # Excel
+    'powerpnt',  # PowerPoint
+    'msaccess',  # Access
+    'mspub',     # Publisher
+    'visio',     # Visio
+    'winproj',   # Project
+    'lync',      # Skype for Business
+    'onedrive',  # OneDrive
+    'msedge'     # Edge (M365 web apps)
+)
+
+function Get-MicrosoftAppProcessNames {
+    return $script:MicrosoftAppProcessNames
+}
+
+# True when a process name is a targeted Microsoft app. Case-insensitive and
+# tolerant of an optional ".exe" suffix so it matches Get-Process output and
+# raw image names alike.
+function Test-IsMicrosoftApp {
+    param([string]$ProcessName)
+    if ([string]::IsNullOrWhiteSpace($ProcessName)) { return $false }
+    $name = $ProcessName.Trim().ToLower()
+    if ($name.EndsWith('.exe')) { $name = $name.Substring(0, $name.Length - 4) }
+    return ($script:MicrosoftAppProcessNames -contains $name)
 }
