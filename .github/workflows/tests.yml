@@ -69,8 +69,14 @@ jobs:
             'PSReviewUnusedParameter'
           )
           $files   = @('.\keepalive.ps1', '.\KeepAlive.Core.ps1')
-          $results = Invoke-ScriptAnalyzer -Path $files -ExcludeRule $exclude -ErrorAction Continue
-          $count   = if ($results) { $results.Count } else { 0 }
+          # -Path takes a single string, so analyze each file in its own call and
+          # collect the results. Passing an array to -Path throws a binding error.
+          $results = foreach ($file in $files) {
+            if (-not (Test-Path $file)) { throw "Expected script not found: $file" }
+            Invoke-ScriptAnalyzer -Path $file -ExcludeRule $exclude -ErrorAction Stop
+          }
+          $results = @($results)
+          $count   = $results.Count
           Write-Host "=== PSScriptAnalyzer: $count result(s) ==="
           # Write findings to step summary so they're visible even without raw log access.
           $summary = "## PSScriptAnalyzer`n`n$count finding(s)`n`n"
