@@ -101,7 +101,9 @@ def cli_to_settings(args: argparse.Namespace, config_path: Optional[str] = None)
 
 
 def _default_config_path() -> str:
-    return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), DEFAULT_CONFIG_NAME)
+    # keepalive.json ships as package data alongside the modules, so the
+    # bundled profiles resolve whether running from source or a pip install.
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), DEFAULT_CONFIG_NAME)
 
 
 def _relaunch_flags(settings: Settings) -> List[str]:

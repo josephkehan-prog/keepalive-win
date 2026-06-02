@@ -95,7 +95,9 @@ CLI flags always take precedence over any value loaded from a `--profile` preset
 
 ## Profiles
 
-Presets live in `keepalive.json` (same format as the PowerShell version):
+Presets live in `keepalive/keepalive.json`, shipped as package data so the
+bundled profiles resolve whether you run from source or a pip install (same
+format as the PowerShell version):
 
 | Profile | Settings |
 |---|---|

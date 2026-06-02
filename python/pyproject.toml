@@ -31,6 +31,9 @@ keepalive = "keepalive.cli:main"
 [tool.setuptools.packages.find]
 include = ["keepalive*"]
 
+[tool.setuptools.package-data]
+keepalive = ["keepalive.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
