@@ -57,12 +57,38 @@ def pid_running(pid: Optional[int]) -> bool:
     except Exception:
         pass
     if is_windows():
-        return False
+        return _pid_exists_windows(pid)
     try:
         os.kill(pid, 0)
     except OSError:
         return False
     return True
+
+
+def _pid_exists_windows(pid: int) -> bool:  # pragma: no cover - Windows-only
+    """Check process existence via Win32 ``OpenProcess`` (no psutil needed).
+
+    A returned handle means the process exists; we still confirm it hasn't
+    exited via ``GetExitCodeProcess``. ``ERROR_ACCESS_DENIED`` means it exists
+    but we lack rights to open it, which still counts as running.
+    """
+    import ctypes
+
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+    STILL_ACTIVE = 259
+    ERROR_ACCESS_DENIED = 5
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+    if not handle:
+        return ctypes.get_last_error() == ERROR_ACCESS_DENIED
+    try:
+        exit_code = ctypes.c_ulong()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(exit_code)):
+            return True
+        return exit_code.value == STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def start_headless(extra_args: List[str]) -> int:
