@@ -26,6 +26,12 @@
         # Intentional: script-level parameters are referenced in nested function bodies
         # (Install-StartupTask, Start-Headless, Enable-StayAwake) which PSScriptAnalyzer
         # may not count as usages when checking the script-level param block.
-        'PSReviewUnusedParameter'
+        'PSReviewUnusedParameter',
+        # Intentional: -Profile is the right user-facing parameter name even though
+        # PowerShell has a $Profile automatic variable; the conflict is harmless here.
+        'PSAvoidAssignmentToAutomaticVariable',
+        # Intentional: functions that return collections use plural nouns
+        # (Get-AwakeFlags, Get-StartupArguments, etc.) which is semantically correct.
+        'PSUseSingularNouns'
     )
 }
