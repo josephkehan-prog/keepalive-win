@@ -156,8 +156,11 @@ pip install '.[test]'
 pytest --cov=keepalive --cov-report=term-missing
 ```
 
-184 tests; the pure-logic modules are at 100% coverage and the suite runs on any
-platform (the Windows-only side effects are covered via injected fakes).
+235 tests at **100% line coverage** — every module, including the Windows-only
+`ctypes` paths (`SetThreadExecutionState`, `GetLastInputInfo`, `OpenProcess`),
+is exercised. The suite runs on any platform because the Win32 handles are
+faked while the real `ctypes.Structure`/`sizeof`/`byref` machinery runs, so the
+Windows side-effect logic is genuinely covered without a Windows host.
 
 ## Scope & limitation
 
