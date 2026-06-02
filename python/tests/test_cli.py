@@ -180,6 +180,248 @@ class TestMain:
         assert cli.main([]) == 0
 
 
+class TestEnableClosureAndKeyboardInterrupt:
+    def test_enable_closure_calls_stay_awake(self, monkeypatch):
+        enable_called = {}
+
+        def fake_loop(**kwargs):
+            kwargs["enable"]()
+
+        monkeypatch.setattr(cli, "run_keepalive", fake_loop)
+        monkeypatch.setattr(
+            cli,
+            "enable_stay_awake",
+            lambda keep_display_on: enable_called.update({"kdo": keep_display_on}),
+        )
+
+        args = cli.build_parser().parse_args([])
+        cli.run(args, Settings())
+
+        assert enable_called["kdo"] is True  # not system_only → keep display on
+
+    def test_run_catches_keyboard_interrupt(self, monkeypatch):
+        def _raise(**kwargs):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(cli, "run_keepalive", _raise)
+        args = cli.build_parser().parse_args([])
+        code = cli.run(args, Settings())
+        assert code == 0
+
+    def test_run_console_fallback_catches_keyboard_interrupt(self, monkeypatch):
+        def _raise(**kwargs):
+            raise KeyboardInterrupt
+
+        monkeypatch.setattr(cli, "run_keepalive", _raise)
+        code = cli.run_console_fallback(Settings(), "", lambda: None, None, None, None)
+        assert code == 0
+
+
+class TestPrintStatusBranches:
+    def test_logon_task_installed_shows_installed(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "logon_task_installed", lambda: True)
+        monkeypatch.setattr(cli, "read_pid", lambda: None)
+        monkeypatch.setattr(cli, "pid_running", lambda pid: False)
+        cli._print_status()
+        assert "installed" in capsys.readouterr().out
+
+    def test_headless_process_running_shows_pid(self, monkeypatch, capsys):
+        monkeypatch.setattr(cli, "logon_task_installed", lambda: False)
+        monkeypatch.setattr(cli, "read_pid", lambda: 9999)
+        monkeypatch.setattr(cli, "pid_running", lambda pid: True)
+        cli._print_status()
+        assert "9999" in capsys.readouterr().out
+
+
+class TestMainBadProfile:
+    def test_bad_profile_returns_1(self, monkeypatch, tmp_path):
+        config = tmp_path / "keepalive.json"
+        config.write_text('{"profiles": {}}', encoding="utf-8")
+        monkeypatch.setattr(cli, "_default_config_path", lambda: str(config))
+        code = cli.main(["--profile", "ghost"])
+        assert code == 1
+
+    def test_main_reraises_non_string_systemexit(self, monkeypatch):
+        monkeypatch.setattr(
+            cli,
+            "cli_to_settings",
+            lambda a: (_ for _ in ()).throw(SystemExit(2)),
+        )
+        with pytest.raises(SystemExit) as exc_info:
+            cli.main([])
+        assert exc_info.value.code == 2
+
+
+class TestRunWithTrayAvailable:
+    def test_routes_through_tray_controller(self, monkeypatch):
+        import keepalive.tray as tray_mod
+
+        loop_captured = {}
+
+        class FakeController:
+            def __init__(self, **kwargs):
+                pass
+
+            def should_stop(self):
+                return True
+
+            def paused(self):
+                return False
+
+            def on_status(self, *a):
+                pass
+
+            def run(self, loop):
+                loop_captured["ran"] = True
+                loop()
+
+        monkeypatch.setattr(tray_mod, "tray_available", lambda: True)
+        monkeypatch.setattr(tray_mod, "TrayController", FakeController)
+        monkeypatch.setattr(cli, "run_keepalive", lambda **kw: None)
+
+        code = cli.run(cli.build_parser().parse_args(["--tray"]), Settings(tray=True))
+        assert code == 0
+        assert loop_captured.get("ran") is True
+
+    def test_gated_nudge_passes_none_through(self, monkeypatch):
+        import keepalive.tray as tray_mod
+
+        nudges_captured = {}
+
+        class FakeController:
+            def __init__(self, **kwargs):
+                pass
+
+            def should_stop(self):
+                return True
+
+            def paused(self):
+                return False
+
+            def on_status(self, *a):
+                pass
+
+            def run(self, loop):
+                loop()
+
+        def fake_run_keepalive(**kwargs):
+            nudges_captured["app_nudge"] = kwargs.get("app_nudge")
+            nudges_captured["browser_nudge"] = kwargs.get("browser_nudge")
+
+        monkeypatch.setattr(tray_mod, "tray_available", lambda: True)
+        monkeypatch.setattr(tray_mod, "TrayController", FakeController)
+        monkeypatch.setattr(cli, "run_keepalive", fake_run_keepalive)
+
+        # No app/browser nudge → gated_nudge(None) returns None
+        cli.run(cli.build_parser().parse_args(["--tray"]), Settings(tray=True))
+        assert nudges_captured["app_nudge"] is None
+        assert nudges_captured["browser_nudge"] is None
+
+    def test_gated_nudge_skips_while_paused(self, monkeypatch):
+        import keepalive.tray as tray_mod
+
+        called = []
+
+        class FakeController:
+            def __init__(self, **kwargs):
+                pass
+
+            def should_stop(self):
+                return True
+
+            def paused(self):
+                return True  # paused → gated nudge should skip
+
+            def on_status(self, *a):
+                pass
+
+            def run(self, loop):
+                loop()
+
+        def fake_run_keepalive(**kwargs):
+            if kwargs.get("nudge"):
+                kwargs["nudge"]()  # invoke the gated nudge
+
+        monkeypatch.setattr(tray_mod, "tray_available", lambda: True)
+        monkeypatch.setattr(tray_mod, "TrayController", FakeController)
+        monkeypatch.setattr(cli, "run_keepalive", fake_run_keepalive)
+        monkeypatch.setattr(cli, "send_idle_nudge", lambda: called.append(1))
+
+        cli.run(cli.build_parser().parse_args(["--tray"]), Settings(tray=True))
+        assert called == []  # nudge skipped because paused
+
+    def test_gated_nudge_fires_when_not_paused(self, monkeypatch):
+        import keepalive.tray as tray_mod
+
+        called = []
+
+        class FakeController:
+            def __init__(self, **kwargs):
+                pass
+
+            def should_stop(self):
+                return True
+
+            def paused(self):
+                return False  # running → gated nudge should fire
+
+            def on_status(self, *a):
+                pass
+
+            def run(self, loop):
+                loop()
+
+        def fake_run_keepalive(**kwargs):
+            if kwargs.get("nudge"):
+                kwargs["nudge"]()
+
+        monkeypatch.setattr(tray_mod, "tray_available", lambda: True)
+        monkeypatch.setattr(tray_mod, "TrayController", FakeController)
+        monkeypatch.setattr(cli, "run_keepalive", fake_run_keepalive)
+        monkeypatch.setattr(cli, "send_idle_nudge", lambda: called.append(1))
+
+        cli.run(cli.build_parser().parse_args(["--tray"]), Settings(tray=True))
+        assert called == [1]  # nudge fired because not paused
+
+    def test_combined_stop_fires_from_outer_stop_when(self, monkeypatch):
+        import keepalive.tray as tray_mod
+
+        combined_stop_result = {}
+
+        class FakeController:
+            def __init__(self, **kwargs):
+                pass
+
+            def should_stop(self):
+                return False  # controller itself not stopping
+
+            def paused(self):
+                return False
+
+            def on_status(self, *a):
+                pass
+
+            def run(self, loop):
+                loop()
+
+        def fake_run_keepalive(**kwargs):
+            # Invoke combined_stop (line 252) via stop_when
+            result = kwargs["stop_when"]()
+            combined_stop_result["fired"] = result
+
+        monkeypatch.setattr(tray_mod, "tray_available", lambda: True)
+        monkeypatch.setattr(tray_mod, "TrayController", FakeController)
+        monkeypatch.setattr(cli, "run_keepalive", fake_run_keepalive)
+
+        # Pass an outer stop_when that returns True so combined_stop returns True
+        args = cli.build_parser().parse_args(["--tray"])
+        settings = Settings(tray=True, max_idle=1)
+        monkeypatch.setattr(cli, "get_idle_seconds", lambda: 9999.0)
+
+        cli.run(args, settings)
+        assert combined_stop_result["fired"] is True
+
+
 class TestJitterAndMaxIdle:
     def test_parses_jitter_and_max_idle(self):
         args = cli.build_parser().parse_args(["--jitter", "10", "--max-idle", "30"])

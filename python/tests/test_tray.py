@@ -1,5 +1,9 @@
 """Tests for keepalive.tray — the system-tray icon presentation logic."""
 
+import sys
+import types
+from unittest.mock import MagicMock
+
 import pytest
 
 from keepalive import tray
@@ -42,6 +46,20 @@ class TestTrayAvailable:
     def test_returns_bool(self):
         assert isinstance(tray.tray_available(), bool)
 
+    def test_returns_true_when_deps_importable(self, monkeypatch):
+        fake_pystray = types.ModuleType("pystray")
+        fake_pil = types.ModuleType("PIL")
+        fake_pil_image = types.ModuleType("PIL.Image")
+        fake_pil.Image = fake_pil_image
+        monkeypatch.setitem(sys.modules, "pystray", fake_pystray)
+        monkeypatch.setitem(sys.modules, "PIL", fake_pil)
+        monkeypatch.setitem(sys.modules, "PIL.Image", fake_pil_image)
+        assert tray.tray_available() is True
+
+    def test_returns_false_when_pystray_missing(self, monkeypatch):
+        monkeypatch.delitem(sys.modules, "pystray", raising=False)
+        assert tray.tray_available() is False
+
 
 class TestBuildIconImage:
     def test_builds_image_or_raises_without_pillow(self):
@@ -56,6 +74,73 @@ class TestBuildIconImage:
         # Closed-eye frame still renders.
         assert tray.build_icon_image(True, 1).size == (64, 64)
         assert tray.build_icon_image(False, 0).size == (64, 64)
+
+    def test_renders_with_mocked_pillow(self, monkeypatch):
+        fake_img = MagicMock()
+        fake_draw = MagicMock()
+
+        fake_image_mod = types.ModuleType("PIL.Image")
+        fake_image_mod.new = MagicMock(return_value=fake_img)
+        fake_imagedraw_mod = types.ModuleType("PIL.ImageDraw")
+        fake_imagedraw_mod.Draw = MagicMock(return_value=fake_draw)
+
+        fake_pil = types.ModuleType("PIL")
+        fake_pil.Image = fake_image_mod
+        fake_pil.ImageDraw = fake_imagedraw_mod
+
+        monkeypatch.setitem(sys.modules, "PIL", fake_pil)
+        monkeypatch.setitem(sys.modules, "PIL.Image", fake_image_mod)
+        monkeypatch.setitem(sys.modules, "PIL.ImageDraw", fake_imagedraw_mod)
+
+        result = tray.build_icon_image(running=True, tick=0, size=64)
+        assert result is fake_img
+        fake_image_mod.new.assert_called_once_with("RGBA", (64, 64), (0, 0, 0, 0))
+
+    def test_renders_blink_frame_with_mocked_pillow(self, monkeypatch):
+        fake_img = MagicMock()
+        fake_draw = MagicMock()
+
+        fake_image_mod = types.ModuleType("PIL.Image")
+        fake_image_mod.new = MagicMock(return_value=fake_img)
+        fake_imagedraw_mod = types.ModuleType("PIL.ImageDraw")
+        fake_imagedraw_mod.Draw = MagicMock(return_value=fake_draw)
+
+        fake_pil = types.ModuleType("PIL")
+        fake_pil.Image = fake_image_mod
+        fake_pil.ImageDraw = fake_imagedraw_mod
+
+        monkeypatch.setitem(sys.modules, "PIL", fake_pil)
+        monkeypatch.setitem(sys.modules, "PIL.Image", fake_image_mod)
+        monkeypatch.setitem(sys.modules, "PIL.ImageDraw", fake_imagedraw_mod)
+
+        # Odd tick → blink (closed eyes rendered via draw.line)
+        result = tray.build_icon_image(running=True, tick=1, size=64)
+        assert result is fake_img
+        assert fake_draw.line.call_count == 2
+
+    def test_renders_paused_state_with_mocked_pillow(self, monkeypatch):
+        fake_img = MagicMock()
+        fake_draw = MagicMock()
+
+        fake_image_mod = types.ModuleType("PIL.Image")
+        fake_image_mod.new = MagicMock(return_value=fake_img)
+        fake_imagedraw_mod = types.ModuleType("PIL.ImageDraw")
+        fake_imagedraw_mod.Draw = MagicMock(return_value=fake_draw)
+
+        fake_pil = types.ModuleType("PIL")
+        fake_pil.Image = fake_image_mod
+        fake_pil.ImageDraw = fake_imagedraw_mod
+
+        monkeypatch.setitem(sys.modules, "PIL", fake_pil)
+        monkeypatch.setitem(sys.modules, "PIL.Image", fake_image_mod)
+        monkeypatch.setitem(sys.modules, "PIL.ImageDraw", fake_imagedraw_mod)
+
+        # Paused (running=False) → amber, open eyes, no blink
+        result = tray.build_icon_image(running=False, tick=0, size=64)
+        assert result is fake_img
+        # Open eyes are drawn with ellipse, not line
+        assert fake_draw.ellipse.call_count == 2
+        assert fake_draw.line.call_count == 0
 
 
 class TestTrayController:
@@ -91,3 +176,13 @@ class TestTrayController:
     def test_refresh_without_icon_is_noop(self):
         c = TrayController()
         c.refresh()  # should not raise
+
+    def test_refresh_swallows_exception_from_broken_icon(self):
+        class _BrokenIcon:
+            def __setattr__(self, name, value):
+                raise RuntimeError(f"broken icon: {name}")
+
+        c = TrayController()
+        # Bypass our __setattr__ guard: assign the broken icon via object.__setattr__.
+        object.__setattr__(c, "_icon", _BrokenIcon())
+        c.refresh()  # must not propagate the RuntimeError
