@@ -1,0 +1,497 @@
+# Instincts generated from https://github.com/josephkehan-prog/keepalive-win
+# Generated: 2026-06-02T14:01:46.857Z
+# Version: 2.0
+# NOTE: This file supplements (does not replace) any existing curated instincts.
+# High-confidence manually curated instincts should be preserved alongside these.
+
+---
+id: keepalive-win-commit-conventional
+trigger: "when writing a commit message"
+confidence: 0.85
+domain: git
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Commit Conventional
+
+## Action
+
+Use conventional commit format with prefixes: ci, feat, fix
+
+## Evidence
+
+- 21 commits analyzed
+- Detected conventional commit pattern
+- Examples: ci: run Pester tests on push and PR via GitHub Actions, feat: add -Install/-Uninstall logon task and -Headless background launch
+
+---
+id: keepalive-win-commit-length
+trigger: "when writing a commit message"
+confidence: 0.6
+domain: git
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Commit Length
+
+## Action
+
+Write moderate-length commit messages (~81 characters)
+
+## Evidence
+
+- Average commit message length: 81 chars
+- Based on 21 commits
+
+---
+id: keepalive-win-naming-files
+trigger: "when creating a new file"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Naming Files
+
+## Action
+
+Use PascalCase naming convention
+
+## Evidence
+
+- Analyzed file naming patterns in repository
+- Dominant pattern: PascalCase
+
+---
+id: keepalive-win-import-relative
+trigger: "when importing modules"
+confidence: 0.75
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Import Relative
+
+## Action
+
+Use relative imports for project files
+
+## Evidence
+
+- Import analysis shows relative import pattern
+- Example: import { x } from '../lib/x'
+
+---
+id: keepalive-win-export-style
+trigger: "when exporting from a module"
+confidence: 0.7
+domain: code-style
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Export Style
+
+## Action
+
+Prefer named exports
+
+## Evidence
+
+- Export pattern analysis
+- Dominant style: named
+
+---
+id: keepalive-win-test-separate
+trigger: "when writing tests"
+confidence: 0.8
+domain: testing
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Test Separate
+
+## Action
+
+Place tests in the tests/ or __tests__/ directory, mirroring src structure
+
+## Evidence
+
+- Separate test directory pattern detected
+- Tests live in dedicated test folders
+
+---
+id: keepalive-win-workflow-feature-development
+trigger: "when implementing a new feature"
+confidence: 0.9
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Workflow Feature Development
+
+## Action
+
+Follow the feature-development workflow:
+1. Add feature implementation
+2. Add tests for feature
+3. Update documentation
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~16x per month
+- Files: **/*.test.*
+
+---
+id: keepalive-win-workflow-add-new-feature-with-tests-and-docs
+trigger: "when doing add new feature with tests and docs"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Workflow Add New Feature With Tests And Docs
+
+## Action
+
+Follow the add-new-feature-with-tests-and-docs workflow:
+1. Implement core logic in KeepAlive.Core.ps1 (pure/testable helpers and parameter handling).
+2. Update keepalive.ps1 to wire up the feature to the CLI and handle side effects.
+3. Add or update Pester tests in KeepAlive.Tests.ps1 to cover the new feature.
+4. Update README.md to document the new feature, flags, and usage.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: KeepAlive.Core.ps1, keepalive.ps1, KeepAlive.Tests.ps1
+
+---
+id: keepalive-win-workflow-ci-pipeline-update-or-rule-tuning
+trigger: "when doing ci pipeline update or rule tuning"
+confidence: 0.75
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Workflow Ci Pipeline Update Or Rule Tuning
+
+## Action
+
+Follow the ci-pipeline-update-or-rule-tuning workflow:
+1. Edit .github/workflows/tests.yml to add, modify, or fix CI steps for running tests or static analysis.
+2. Edit PSScriptAnalyzerSettings.psd1 to add, exclude, or whitelist rules as needed.
+3. Optionally, update code files (e.g., keepalive.ps1, KeepAlive.Core.ps1) to comply with or suppress analyzer findings.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~5x per month
+- Files: .github/workflows/tests.yml, PSScriptAnalyzerSettings.psd1
+
+---
+id: keepalive-win-workflow-fix-analyzer-or-locale-issue
+trigger: "when doing fix analyzer or locale issue"
+confidence: 0.65
+domain: workflow
+source: repo-analysis
+source_repo: https://github.com/josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Workflow Fix Analyzer Or Locale Issue
+
+## Action
+
+Follow the fix-analyzer-or-locale-issue workflow:
+1. Edit code files (keepalive.ps1, KeepAlive.Core.ps1) to fix the flagged issue (e.g., inline constants, locale-safe matching, variable scope).
+2. Optionally, update PSScriptAnalyzerSettings.psd1 to suppress or exclude the rule if the pattern is intentional.
+3. Optionally, update .github/workflows/tests.yml if CI logic needs to be adjusted.
+
+## Evidence
+
+- Workflow detected from commit patterns
+- Frequency: ~3x per month
+- Files: keepalive.ps1, KeepAlive.Core.ps1, PSScriptAnalyzerSettings.psd1
+
+---
+id: keepalive-win-instinct-file-naming
+trigger: "When creating or renaming a file"
+confidence: 0.85
+domain: code-style
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct File Naming
+
+## Action
+
+Use PascalCase for file names (e.g., KeepAlive.Core.ps1)
+
+## Evidence
+
+- Pattern in files: KeepAlive.Core.ps1, KeepAlive.Tests.ps1
+
+---
+id: keepalive-win-instinct-function-naming
+trigger: "When defining a function"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Function Naming
+
+## Action
+
+Use camelCase for function names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.functions
+
+---
+id: keepalive-win-instinct-class-naming
+trigger: "When defining a class"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Class Naming
+
+## Action
+
+Use PascalCase for class names
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.classes
+
+---
+id: keepalive-win-instinct-constant-naming
+trigger: "When declaring a constant"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Constant Naming
+
+## Action
+
+Use SCREAMING_SNAKE_CASE for constants
+
+## Evidence
+
+- Pattern in codeStyle.namingConventions.constants
+
+---
+id: keepalive-win-instinct-import-style
+trigger: "When importing modules"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Import Style
+
+## Action
+
+Use relative import paths
+
+## Evidence
+
+- Pattern in codeStyle.importStyle
+
+---
+id: keepalive-win-instinct-export-style
+trigger: "When exporting modules or functions"
+confidence: 0.8
+domain: code-style
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Export Style
+
+## Action
+
+Use named exports
+
+## Evidence
+
+- Pattern in codeStyle.exportStyle
+
+---
+id: keepalive-win-instinct-test-location
+trigger: "When adding or updating tests"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Test Location
+
+## Action
+
+Place test files in a separate file (e.g., KeepAlive.Tests.ps1), not inline with implementation
+
+## Evidence
+
+- Pattern in architecture.folderStructure.testLocation
+- Files: KeepAlive.Tests.ps1
+
+---
+id: keepalive-win-instinct-test-pattern
+trigger: "When implementing a new feature"
+confidence: 0.9
+domain: testing
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Test Pattern
+
+## Action
+
+Add or update Pester tests in KeepAlive.Tests.ps1 to cover the new feature
+
+## Evidence
+
+- Workflow: add-new-feature-with-tests-and-docs
+- Commit: Add or update Pester tests in KeepAlive.Tests.ps1 to cover the new feature.
+
+---
+id: keepalive-win-instinct-test-sequence
+trigger: "When developing a feature"
+confidence: 0.85
+domain: testing
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Test Sequence
+
+## Action
+
+Write tests after implementing the feature logic, before updating documentation
+
+## Evidence
+
+- Workflow: feature-development.commitSequence
+- Workflow: add-new-feature-with-tests-and-docs.commitSequence
+
+---
+id: keepalive-win-instinct-git-commit-format
+trigger: "When writing a commit message"
+confidence: 0.9
+domain: git
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Git Commit Format
+
+## Action
+
+Use conventional commit prefixes: 'ci', 'feat', or 'fix', followed by a colon and a short description
+
+## Evidence
+
+- Pattern in commits.prefixes
+- Examples: 'ci: run Pester tests on push and PR via GitHub Actions', 'feat: add -SystemOnly to keep machine awake while letting display sleep'
+
+---
+id: keepalive-win-instinct-git-commit-length
+trigger: "When composing a commit message"
+confidence: 0.7
+domain: git
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Git Commit Length
+
+## Action
+
+Keep commit messages concise, averaging around 80 characters
+
+## Evidence
+
+- Pattern in commits.averageLength
+
+---
+id: keepalive-win-instinct-workflow-new-feature
+trigger: "When someone wants to add a new user-facing feature or flag to the CLI"
+confidence: 0.95
+domain: workflow
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Workflow New Feature
+
+## Action
+
+Implement core logic in KeepAlive.Core.ps1, update keepalive.ps1 for CLI wiring, add/update Pester tests in KeepAlive.Tests.ps1, and update README.md
+
+## Evidence
+
+- Workflow: add-new-feature-with-tests-and-docs
+- Commit sequence and files: KeepAlive.Core.ps1, keepalive.ps1, KeepAlive.Tests.ps1, README.md
+
+---
+id: keepalive-win-instinct-workflow-ci-tune
+trigger: "When someone wants to add, fix, or tune CI jobs or analyzer rules for code quality enforcement"
+confidence: 0.92
+domain: workflow
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Workflow Ci Tune
+
+## Action
+
+Edit .github/workflows/tests.yml and PSScriptAnalyzerSettings.psd1 as needed, optionally update code files to comply with analyzer findings
+
+## Evidence
+
+- Workflow: ci-pipeline-update-or-rule-tuning
+- Commit sequence and files: .github/workflows/tests.yml, PSScriptAnalyzerSettings.psd1
+
+---
+id: keepalive-win-instinct-workflow-fix-analyzer
+trigger: "When CI or code review surfaces analyzer warnings/errors or locale-related bugs"
+confidence: 0.88
+domain: workflow
+source: repo-analysis
+source_repo: josephkehan-prog/keepalive-win
+---
+
+# Keepalive Win Instinct Workflow Fix Analyzer
+
+## Action
+
+Edit code files to fix the flagged issue, optionally update PSScriptAnalyzerSettings.psd1 or .github/workflows/tests.yml if needed
+
+## Evidence
+
+- Workflow: fix-analyzer-or-locale-issue
+- Commit sequence and files: keepalive.ps1, KeepAlive.Core.ps1, PSScriptAnalyzerSettings.psd1
+
