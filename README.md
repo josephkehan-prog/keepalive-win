@@ -3,6 +3,11 @@
 A zero-dependency Windows PowerShell CLI that keeps your machine awake so M365 web tabs
 (Outlook / SharePoint / Teams) don't auto-log-out from sleep, screen-lock, or idle.
 
+> **Python port:** a feature-equivalent Python implementation — with an optional
+> **system-tray icon** (`--tray`) — lives in [`python/`](python/README.md). It mirrors
+> every flag and profile here and adds a notification-area icon so the keep-alive can
+> run without a visible console. See [`python/README.md`](python/README.md).
+
 ## How it works
 
 While running, it:
