@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keepalive-win"
+version = "1.0.0"
+description = "Keep Windows awake so M365 web tabs don't auto-log-out — with an optional system-tray icon."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+keywords = ["windows", "keep-awake", "idle", "m365", "tray"]
+
+dependencies = []
+
+[project.optional-dependencies]
+# System-tray icon (the --tray flag).
+tray = ["pystray>=0.19", "Pillow>=9.0"]
+# Per-window app nudge and headless process management.
+apps = ["psutil>=5.9"]
+# Browser tab keep-alive over CDP.
+browser = ["websocket-client>=1.5"]
+# Everything, for a full Windows install.
+all = ["pystray>=0.19", "Pillow>=9.0", "psutil>=5.9", "websocket-client>=1.5"]
+# Test tooling.
+test = ["pytest>=7", "pytest-cov>=4"]
+
+[project.scripts]
+keepalive = "keepalive.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["keepalive*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["keepalive"]
+omit = ["keepalive/__main__.py"]
