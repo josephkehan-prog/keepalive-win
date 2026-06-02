@@ -4,6 +4,21 @@
 # Minimum interval guard: anything faster than this is pointless thrash.
 $script:MinIntervalSeconds = 10
 
+# ASCII cat frames for the "CLI is active" indicator shown on each status line.
+# Alternating frames make the cat blink, so it's visually obvious the loop is
+# still alive. ASCII-only by design: keeps the scripts encoding-clean for CI
+# (PSScriptAnalyzer / no-BOM) the same way the rest of the file is.
+$script:CatFrames = @('=^.^=', '=^-^=')
+
+function Get-CatFrame {
+    # Returns the cat frame for a given tick counter, cycling through the frames.
+    # Pure and deterministic so the animation can be unit-tested without timing.
+    param([int]$Counter = 0)
+    $frames = $script:CatFrames
+    $idx = [math]::Abs($Counter) % $frames.Count
+    return $frames[$idx]
+}
+
 function Test-IntervalValid {
     param([int]$IntervalSeconds)
     return ($IntervalSeconds -ge $script:MinIntervalSeconds)
@@ -132,11 +147,14 @@ function Invoke-KeepAlive {
     $start   = & $Clock
     $endTime = Get-EndTime -Start $start -Minutes $Minutes
     $banner  = if ($endTime) {
-        "Keeping awake$ModeSuffix until $($endTime.ToString('HH:mm:ss')). Press Ctrl+C to stop."
+        "$(Get-CatFrame) Keeping awake$ModeSuffix until $($endTime.ToString('HH:mm:ss')). Press Ctrl+C to stop."
     } else {
-        "Keeping awake$ModeSuffix. Press Ctrl+C to stop."
+        "$(Get-CatFrame) Keeping awake$ModeSuffix. Press Ctrl+C to stop."
     }
     Write-Host $banner
+    # Counts status lines so the cat blinks (alternates frames) each tick, a
+    # live sign that the keep-alive loop is still running.
+    $statusTick = 0
     try {
         if ($Enable) { & $Enable }
         while ($true) {
@@ -146,7 +164,8 @@ function Invoke-KeepAlive {
             if ($AppNudge)     { & $AppNudge }
             if ($BrowserNudge) { & $BrowserNudge }
             if (-not $Quiet) {
-                Write-Host ("[{0}] awake - next nudge in {1}s" -f (& $Clock).ToString('HH:mm:ss'), $IntervalSeconds)
+                Write-Host ("{0} [{1}] awake - next nudge in {2}s" -f (Get-CatFrame -Counter $statusTick), (& $Clock).ToString('HH:mm:ss'), $IntervalSeconds)
+                $statusTick++
             }
             # Sleep in 1s slices so Ctrl+C and -Minutes stay responsive.
             for ($i = 0; $i -lt $IntervalSeconds; $i++) {
@@ -158,7 +177,7 @@ function Invoke-KeepAlive {
     }
     finally {
         if ($Restore) { & $Restore }
-        Write-Host "Stopped - normal power behavior restored."
+        Write-Host "=^.^=zZ Stopped - normal power behavior restored."
     }
 }
 

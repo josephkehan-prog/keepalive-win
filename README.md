@@ -20,6 +20,10 @@ With `-BrowserKeepAlive` it also connects to Chrome/Edge via the remote debuggin
 timer for cases where the server-side M365 session timeout is the root cause. Requires the
 browser to be launched with `--remote-debugging-port=9222`.
 
+While it runs, each status line is prefixed with a small ASCII cat that blinks
+(`=^.^=` / `=^-^=`) so you can tell at a glance the CLI is still active; on exit it
+prints a sleeping cat (`=^.^=zZ`).
+
 On exit it always restores normal power behavior (`try/finally`).
 
 ## Usage
@@ -79,7 +83,7 @@ M365 idle session timeout that keys off browser-tab interaction. For that case, 
 |---|---|
 | `keepalive.ps1` | The CLI (param block + Win32 P/Invoke + run loop + lifecycle management) |
 | `KeepAlive.Core.ps1` | Pure, testable logic (interval, flags, loop, PID path, profiles, CDP URL helpers) |
-| `KeepAlive.Tests.ps1` | Pester tests (53 tests, 100% core coverage) |
+| `KeepAlive.Tests.ps1` | Pester tests (60 tests, 100% core coverage) |
 | `keepalive.json` | Named profile presets (`meeting`, `focus`, `overnight`, `tab`) |
 | `PSScriptAnalyzerSettings.psd1` | PSScriptAnalyzer rule exclusions for CI |
 | `keepalive.cmd` | Double-click / `keepalive` launcher |

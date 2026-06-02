@@ -53,6 +53,31 @@ Describe 'Get-AwakeFlags' {
     }
 }
 
+Describe 'Get-CatFrame' {
+    It 'returns the eyes-open cat for tick 0' {
+        Get-CatFrame -Counter 0 | Should Be '=^.^='
+    }
+    It 'returns the blinking cat for tick 1' {
+        Get-CatFrame -Counter 1 | Should Be '=^-^='
+    }
+    It 'wraps back to the first frame after the last' {
+        Get-CatFrame -Counter 2 | Should Be '=^.^='
+    }
+    It 'alternates frames on consecutive ticks' {
+        (Get-CatFrame -Counter 3) | Should Be '=^-^='
+    }
+    It 'defaults to the eyes-open cat with no counter' {
+        Get-CatFrame | Should Be '=^.^='
+    }
+    It 'handles a negative counter without throwing' {
+        Get-CatFrame -Counter -1 | Should Be '=^-^='
+    }
+    It 'returns an ASCII-only string (no non-ASCII bytes)' {
+        $frame = Get-CatFrame -Counter 0
+        ($frame.ToCharArray() | Where-Object { [int]$_ -gt 127 }).Count | Should Be 0
+    }
+}
+
 Describe 'Test-ShouldStop' {
     $now = [datetime]'2026-05-31T12:00:00'
 
