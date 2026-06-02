@@ -23,6 +23,8 @@ def startup_arguments(
     system_only: bool = False,
     all_microsoft_apps: bool = False,
     tray: bool = False,
+    jitter: int = 0,
+    max_idle: int = 0,
 ) -> List[str]:
     """Build the keepalive CLI flags used to relaunch the tool.
 
@@ -43,4 +45,8 @@ def startup_arguments(
         args.append("--all-microsoft-apps")
     if tray:
         args.append("--tray")
+    if jitter:
+        args += ["--jitter", str(jitter)]
+    if max_idle:
+        args += ["--max-idle", str(max_idle)]
     return args

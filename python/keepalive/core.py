@@ -7,8 +7,12 @@ implementations stay behaviourally identical and unit-testable.
 
 from __future__ import annotations
 
+import random as _random
 from datetime import datetime, timedelta
 from typing import Optional
+
+# GetTickCount wraps at 2**32 milliseconds (~49.7 days).
+_TICK_WRAP_MASK = 0xFFFFFFFF
 
 # Minimum interval guard: anything faster than this is pointless thrash.
 MIN_INTERVAL_SECONDS = 10
@@ -68,6 +72,43 @@ def awake_flags(keep_system_awake: bool = True, keep_display_on: bool = True) ->
 def release_flags() -> int:
     """The bitmask used on exit to restore normal power behaviour."""
     return ES_CONTINUOUS
+
+
+def apply_jitter(interval_seconds: int, jitter_seconds: int, rng=None) -> int:
+    """Return the interval randomized by ``±jitter_seconds``.
+
+    ``jitter_seconds <= 0`` disables jitter and returns the interval unchanged.
+    The result is clamped to at least 1 second so a large jitter can never
+    produce a zero or negative wait. ``rng`` is injectable for deterministic
+    tests; it defaults to the module ``random``.
+    """
+    if jitter_seconds <= 0:
+        return interval_seconds
+    rng = rng or _random
+    delta = rng.randint(-jitter_seconds, jitter_seconds)
+    return max(1, interval_seconds + delta)
+
+
+def idle_exceeded(idle_seconds: float, max_idle_minutes: int) -> bool:
+    """True when real user-input idle time has passed the configured limit.
+
+    ``max_idle_minutes <= 0`` disables the check (returns ``False``). Used to
+    stop the keep-alive once the machine has genuinely been abandoned, so it
+    can fall back to normal power management.
+    """
+    if max_idle_minutes <= 0:
+        return False
+    return idle_seconds >= max_idle_minutes * 60
+
+
+def idle_seconds_from_ticks(last_input_ms: int, now_ms: int) -> float:
+    """Seconds between the last input tick and now, handling 32-bit wraparound.
+
+    Both values come from the Win32 millisecond tick counter, which wraps at
+    2**32. Masking the difference keeps the result correct across a wrap.
+    """
+    diff = (now_ms - last_input_ms) & _TICK_WRAP_MASK
+    return diff / 1000.0
 
 
 def should_stop(now: datetime, end: Optional[datetime]) -> bool:

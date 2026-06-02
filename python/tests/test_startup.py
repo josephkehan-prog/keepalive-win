@@ -51,3 +51,19 @@ def test_composes_every_option_in_order():
         "--all-microsoft-apps",
         "--tray",
     ]
+
+
+def test_jitter_flag():
+    assert startup.startup_arguments(jitter=10) == ["--jitter", "10"]
+
+
+def test_jitter_omitted_when_zero():
+    assert startup.startup_arguments(jitter=0) == []
+
+
+def test_max_idle_flag():
+    assert startup.startup_arguments(max_idle=30) == ["--max-idle", "30"]
+
+
+def test_max_idle_omitted_when_zero():
+    assert startup.startup_arguments(max_idle=0) == []

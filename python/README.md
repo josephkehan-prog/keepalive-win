@@ -39,6 +39,18 @@ keepalive --tray --system-only --interval-seconds 45
 If the optional tray dependencies aren't installed it prints a hint and falls
 back to console mode.
 
+### Jitter and idle-aware stop
+
+`--jitter SECONDS` randomizes each interval to `interval ± jitter` (clamped to
+at least 1s), so the nudges don't fire on a perfectly fixed cadence.
+
+`--max-idle MINUTES` makes the keep-alive *idle-aware*: it reads the real
+user-input idle time (`GetLastInputInfo`) each cycle and stops once you've been
+away from the keyboard/mouse longer than the threshold — so a machine you've
+genuinely abandoned is allowed to fall back to normal power management instead
+of being held awake indefinitely. Off Windows the idle reading is `0`, so the
+stop never trips.
+
 ## Install
 
 ```bash
@@ -61,6 +73,8 @@ keepalive --system-only            # keep the machine awake but let the display 
 keepalive --all-microsoft-apps     # also keep Outlook/Teams/Office/Edge non-idle when backgrounded
 keepalive --browser-keep-alive     # also nudge M365 browser tabs via CDP
 keepalive --watch-process teams    # auto-stop when Teams exits
+keepalive --jitter 15              # vary each nudge interval by +/-15s
+keepalive --max-idle 30            # stop if you've been away from the keyboard 30 min
 keepalive --profile meeting        # load the 'meeting' preset from keepalive.json
 keepalive --tray                   # run from a system-tray icon
 keepalive --headless               # run detached in the background, then close the terminal
@@ -83,6 +97,8 @@ You can also run it without installing: `python -m keepalive ...`.
 | `--all-microsoft-apps` | off | Also keep running Microsoft desktop apps non-idle when backgrounded. |
 | `--browser-keep-alive` | off | Also nudge M365 browser tabs via CDP (needs `--remote-debugging-port=9222`). |
 | `--watch-process NAME` | — | Auto-stop when the named process (e.g. `teams`) exits. |
+| `--jitter SECONDS` | `0` | Randomize each nudge interval by ±SECONDS so the pattern looks less robotic. |
+| `--max-idle MINUTES` | `0` | Auto-stop once real user input has been idle this long (machine truly abandoned). |
 | `--profile NAME` | — | Load defaults from a named preset in `keepalive.json`. |
 | `--tray` | off | Show a system-tray icon (needs the `tray` extra). |
 | `--headless` | off | Relaunch detached in the background and return immediately. |
@@ -119,7 +135,7 @@ without Windows:
 
 | Module | Responsibility |
 |---|---|
-| `core.py` | Interval/flags/cat-frame/should-stop — pure |
+| `core.py` | Interval/flags/cat-frame/should-stop, jitter, idle math — pure |
 | `settings.py` | CLI + profile precedence — pure |
 | `config.py` | `keepalive.json` loading, PID/task paths — pure |
 | `apps.py` | Microsoft app name matching — pure |
@@ -140,7 +156,7 @@ pip install '.[test]'
 pytest --cov=keepalive --cov-report=term-missing
 ```
 
-153 tests; the pure-logic modules are at 100% coverage and the suite runs on any
+184 tests; the pure-logic modules are at 100% coverage and the suite runs on any
 platform (the Windows-only side effects are covered via injected fakes).
 
 ## Scope & limitation

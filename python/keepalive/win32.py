@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import sys
 
-from .core import awake_flags, release_flags
+from .core import awake_flags, idle_seconds_from_ticks, release_flags
 
 # Virtual-key code for F15 — a key no normal keyboard sends, so nudging it
 # resets the idle timer without disturbing the user's input.
@@ -55,3 +55,29 @@ def send_idle_nudge() -> None:
     user32 = _user32()
     user32.keybd_event(VK_F15, 0, 0, 0)
     user32.keybd_event(VK_F15, 0, KEYEVENTF_KEYUP, 0)
+
+
+def get_idle_seconds() -> float:
+    """Seconds since the last real user input (keyboard/mouse).
+
+    Uses ``GetLastInputInfo`` + ``GetTickCount`` on Windows; returns ``0.0``
+    off Windows so idle-aware logic simply never trips on other platforms.
+    """
+    if not is_windows():
+        return 0.0
+    return _query_idle_seconds()
+
+
+def _query_idle_seconds() -> float:  # pragma: no cover - Windows-only ctypes
+    import ctypes
+
+    class _LastInputInfo(ctypes.Structure):
+        _fields_ = [("cbSize", ctypes.c_uint), ("dwTime", ctypes.c_uint)]
+
+    info = _LastInputInfo()
+    info.cbSize = ctypes.sizeof(_LastInputInfo)
+    user32 = _user32()
+    if not user32.GetLastInputInfo(ctypes.byref(info)):
+        return 0.0
+    now_ms = _kernel32().GetTickCount()
+    return idle_seconds_from_ticks(info.dwTime, now_ms)

@@ -23,6 +23,8 @@ _PROFILE_KEY_MAP = {
     "AllMicrosoftApps": "all_microsoft_apps",
     "BrowserKeepAlive": "browser_keep_alive",
     "Tray": "tray",
+    "Jitter": "jitter",
+    "MaxIdle": "max_idle",
 }
 
 
@@ -37,6 +39,8 @@ class Settings:
     all_microsoft_apps: bool = False
     browser_keep_alive: bool = False
     tray: bool = False
+    jitter: int = 0
+    max_idle: int = 0
 
 
 def resolve_settings(
@@ -73,4 +77,6 @@ def resolve_settings(
         all_microsoft_apps=bool(pick("all_microsoft_apps", False)),
         browser_keep_alive=bool(pick("browser_keep_alive", False)),
         tray=bool(pick("tray", False)),
+        jitter=int(pick("jitter", 0)),
+        max_idle=int(pick("max_idle", 0)),
     )

@@ -33,8 +33,8 @@ from .nudge import (
 from .runner import run_keepalive
 from .settings import Settings, resolve_settings
 from .startup import startup_arguments
-from .core import interval_valid
-from .win32 import enable_stay_awake, restore_power, send_idle_nudge
+from .core import apply_jitter, idle_exceeded, interval_valid
+from .win32 import enable_stay_awake, get_idle_seconds, restore_power, send_idle_nudge
 
 DEFAULT_CONFIG_NAME = "keepalive.json"
 
@@ -68,6 +68,10 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Load defaults from a named preset in keepalive.json.")
     parser.add_argument("--tray", action="store_true",
                         help="Show a system-tray icon to run quietly from the notification area.")
+    parser.add_argument("--jitter", type=int, default=None, metavar="SECONDS",
+                        help="Randomize each nudge interval by +/- SECONDS so the pattern looks less robotic.")
+    parser.add_argument("--max-idle", type=int, default=None, metavar="MINUTES",
+                        help="Auto-stop once real user input has been idle this long (machine truly abandoned).")
     # Lifecycle (each exits after running).
     parser.add_argument("--install", action="store_true", help="Register a run-at-logon task, then exit.")
     parser.add_argument("--uninstall", action="store_true", help="Remove the logon task, then exit.")
@@ -96,6 +100,8 @@ def cli_to_settings(args: argparse.Namespace, config_path: Optional[str] = None)
         "all_microsoft_apps": args.all_microsoft_apps,
         "browser_keep_alive": args.browser_keep_alive,
         "tray": args.tray,
+        "jitter": args.jitter,
+        "max_idle": args.max_idle,
     }
     return resolve_settings(cli, preset)
 
@@ -166,6 +172,28 @@ def _build_callbacks(settings: Settings):
     return app_nudge, browser_nudge
 
 
+def _build_next_interval(settings: Settings):
+    """A per-cycle interval provider for --jitter, or None when disabled."""
+    if settings.jitter > 0:
+        return lambda: apply_jitter(settings.interval_seconds, settings.jitter)
+    return None
+
+
+def _idle_stopper(settings: Settings):
+    """A stop predicate that fires once real user-idle exceeds --max-idle."""
+    if settings.max_idle > 0:
+        return lambda: idle_exceeded(get_idle_seconds(), settings.max_idle)
+    return None
+
+
+def _compose_stop_when(*predicates):
+    """Combine stop predicates with OR; returns None when none are active."""
+    active = [p for p in predicates if p]
+    if not active:
+        return None
+    return lambda: any(p() for p in active)
+
+
 def run(args: argparse.Namespace, settings: Settings) -> int:
     """Run the foreground (or tray) keep-alive loop. Returns an exit code."""
     if not interval_valid(settings.interval_seconds):
@@ -179,12 +207,15 @@ def run(args: argparse.Namespace, settings: Settings) -> int:
     mode_suffix = " (display may sleep)" if settings.system_only else ""
     app_nudge, browser_nudge = _build_callbacks(settings)
     watch_stopper = make_watch_process_stopper(args.watch_process)
+    stop_when = _compose_stop_when(watch_stopper, _idle_stopper(settings))
+    next_interval = _build_next_interval(settings)
 
     def enable() -> None:
         enable_stay_awake(keep_display_on=not settings.system_only)
 
     if settings.tray:
-        return _run_with_tray(settings, mode_suffix, enable, app_nudge, browser_nudge, watch_stopper)
+        return _run_with_tray(settings, mode_suffix, enable, app_nudge,
+                              browser_nudge, stop_when, next_interval)
 
     try:
         run_keepalive(
@@ -197,25 +228,28 @@ def run(args: argparse.Namespace, settings: Settings) -> int:
             nudge=send_idle_nudge,
             app_nudge=app_nudge,
             browser_nudge=browser_nudge,
-            stop_when=watch_stopper,
+            stop_when=stop_when,
+            next_interval=next_interval,
         )
     except KeyboardInterrupt:
         pass
     return 0
 
 
-def _run_with_tray(settings, mode_suffix, enable, app_nudge, browser_nudge, watch_stopper) -> int:
+def _run_with_tray(settings, mode_suffix, enable, app_nudge, browser_nudge,
+                   stop_when, next_interval) -> int:
     from .tray import TrayController, tray_available
 
     if not tray_available():
         print("Tray icon needs 'pystray' and 'Pillow'. Install with: "
               "pip install 'keepalive[tray]'. Falling back to console mode.", file=sys.stderr)
-        return run_console_fallback(settings, mode_suffix, enable, app_nudge, browser_nudge, watch_stopper)
+        return run_console_fallback(settings, mode_suffix, enable, app_nudge,
+                                    browser_nudge, stop_when, next_interval)
 
     controller = TrayController(interval_seconds=settings.interval_seconds, mode_suffix=mode_suffix)
 
     def combined_stop() -> bool:
-        return controller.should_stop() or bool(watch_stopper and watch_stopper())
+        return controller.should_stop() or bool(stop_when and stop_when())
 
     def gated_nudge(fn):
         # Honour the tray Pause toggle: skip the nudge while paused.
@@ -241,13 +275,15 @@ def _run_with_tray(settings, mode_suffix, enable, app_nudge, browser_nudge, watc
             browser_nudge=gated_nudge(browser_nudge),
             stop_when=combined_stop,
             on_status=controller.on_status,
+            next_interval=next_interval,
         )
 
     controller.run(loop)
     return 0
 
 
-def run_console_fallback(settings, mode_suffix, enable, app_nudge, browser_nudge, watch_stopper) -> int:
+def run_console_fallback(settings, mode_suffix, enable, app_nudge, browser_nudge,
+                         stop_when, next_interval=None) -> int:
     try:
         run_keepalive(
             interval_seconds=settings.interval_seconds,
@@ -259,7 +295,8 @@ def run_console_fallback(settings, mode_suffix, enable, app_nudge, browser_nudge
             nudge=send_idle_nudge,
             app_nudge=app_nudge,
             browser_nudge=browser_nudge,
-            stop_when=watch_stopper,
+            stop_when=stop_when,
+            next_interval=next_interval,
         )
     except KeyboardInterrupt:
         pass

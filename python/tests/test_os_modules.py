@@ -133,3 +133,9 @@ class TestNudgeBrowserPaths:
         # Use a non-empty list to assert the True branch.
         monkeypatch.setattr(nudge, "fetch_debug_tabs", lambda debug_port=9222: [{"url": "x"}])
         assert nudge.browser_debug_port_open() is True
+
+
+class TestWin32Idle:
+    def test_get_idle_seconds_zero_off_windows(self, monkeypatch):
+        monkeypatch.setattr(win32, "is_windows", lambda: False)
+        assert win32.get_idle_seconds() == 0.0

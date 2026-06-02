@@ -178,3 +178,49 @@ class TestMain:
     def test_main_runs_loop(self, monkeypatch):
         monkeypatch.setattr(cli, "run_keepalive", lambda **kw: None)
         assert cli.main([]) == 0
+
+
+class TestJitterAndMaxIdle:
+    def test_parses_jitter_and_max_idle(self):
+        args = cli.build_parser().parse_args(["--jitter", "10", "--max-idle", "30"])
+        assert args.jitter == 10
+        assert args.max_idle == 30
+
+    def test_jitter_defaults_none(self):
+        args = cli.build_parser().parse_args([])
+        assert args.jitter is None
+        assert args.max_idle is None
+
+    def test_run_passes_next_interval_when_jitter_set(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(cli, "run_keepalive", lambda **kw: captured.update(kw))
+        args = cli.build_parser().parse_args([])
+        cli.run(args, Settings(jitter=10))
+        assert captured.get("next_interval") is not None
+        # The provider returns an int near the base interval.
+        assert isinstance(captured["next_interval"](), int)
+
+    def test_run_no_next_interval_without_jitter(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(cli, "run_keepalive", lambda **kw: captured.update(kw))
+        args = cli.build_parser().parse_args([])
+        cli.run(args, Settings())
+        assert captured.get("next_interval") is None
+
+    def test_max_idle_composes_stop_when(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(cli, "run_keepalive", lambda **kw: captured.update(kw))
+        # Force the idle reading above the threshold so stop_when() fires True.
+        monkeypatch.setattr(cli, "get_idle_seconds", lambda: 9999.0)
+        args = cli.build_parser().parse_args([])
+        cli.run(args, Settings(max_idle=1))
+        stop_when = captured.get("stop_when")
+        assert stop_when is not None
+        assert stop_when() is True
+
+    def test_no_stop_when_without_watch_or_idle(self, monkeypatch):
+        captured = {}
+        monkeypatch.setattr(cli, "run_keepalive", lambda **kw: captured.update(kw))
+        args = cli.build_parser().parse_args([])
+        cli.run(args, Settings())
+        assert captured.get("stop_when") is None

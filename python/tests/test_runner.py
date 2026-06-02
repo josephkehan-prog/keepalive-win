@@ -163,3 +163,38 @@ def test_on_status_invoked():
         on_status=lambda tick, frame, now: seen.append((tick, frame)),
     )
     assert seen and seen[0][0] == 0
+
+
+def test_next_interval_overrides_sleep_count():
+    # When a next_interval provider is given (used by --jitter), the inner
+    # sleep loop should run that many ticks per cycle instead of interval_seconds.
+    ticks = {"count": 0}
+    intervals = iter([3])  # one cycle then stop
+    run_keepalive(
+        interval_seconds=60,
+        stop_when=lambda: ticks["count"] >= 3,  # stop after 3 ticks
+        next_interval=lambda: next(intervals),
+        nudge=lambda: None,
+        enable=lambda: None,
+        restore=lambda: None,
+        tick=lambda: ticks.__setitem__("count", ticks["count"] + 1),
+        emit=_noop_emit,
+        quiet=True,
+    )
+    # 3 ticks consumed from the single jittered interval of 3.
+    assert ticks["count"] == 3
+
+
+def test_status_line_reflects_jittered_interval():
+    lines = []
+    run_keepalive(
+        interval_seconds=60,
+        next_interval=lambda: 42,
+        stop_when=lambda: len(lines) > 1,  # stop after first status line
+        enable=lambda: None,
+        restore=lambda: None,
+        nudge=lambda: None,
+        tick=lambda: None,
+        emit=lines.append,
+    )
+    assert any("next nudge in 42s" in line for line in lines)

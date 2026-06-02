@@ -37,6 +37,7 @@ def run_keepalive(
     tick: Optional[Action] = None,
     emit: Optional[Callable[[str], None]] = None,
     on_status: Optional[Callable[[int, str, datetime], None]] = None,
+    next_interval: Optional[Callable[[], int]] = None,
 ) -> None:
     """Run the keep-alive loop until auto-stop, ``stop_when``, or interruption.
 
@@ -51,6 +52,9 @@ def run_keepalive(
       and real I/O. ``tick`` defaults to ``time.sleep(1)``.
     * ``on_status`` is notified ``(tick, frame, now)`` on each status emission,
       letting a tray icon animate in step with the CLI.
+    * ``next_interval``, when given, supplies the wait (in seconds) for the
+      upcoming cycle instead of the fixed ``interval_seconds`` — used by
+      ``--jitter`` to vary each interval.
     """
     clock = clock or datetime.now
     emit = emit or _default_emit
@@ -84,18 +88,19 @@ def run_keepalive(
                 app_nudge()
             if browser_nudge:
                 browser_nudge()
+            current_interval = next_interval() if next_interval else interval_seconds
             if not quiet:
                 now = clock()
                 frame = cat_frame(status_tick)
                 emit(
                     f"{frame} [{now.strftime('%H:%M:%S')}] awake - "
-                    f"next nudge in {interval_seconds}s"
+                    f"next nudge in {current_interval}s"
                 )
                 if on_status:
                     on_status(status_tick, frame, now)
                 status_tick += 1
             # Sleep in 1s slices so Ctrl+C and --minutes stay responsive.
-            for _ in range(interval_seconds):
+            for _ in range(current_interval):
                 if should_stop(clock(), end):
                     break
                 if stop_when and stop_when():

@@ -67,3 +67,26 @@ def test_unknown_profile_keys_ignored():
     preset = {"Bogus": 1, "Minutes": 5}
     s = resolve_settings(_empty_cli(), preset)
     assert s.minutes == 5
+
+
+def test_jitter_from_cli():
+    s = resolve_settings(_empty_cli(jitter=10))
+    assert s.jitter == 10
+
+
+def test_max_idle_from_cli():
+    s = resolve_settings(_empty_cli(max_idle=30))
+    assert s.max_idle == 30
+
+
+def test_jitter_and_max_idle_default_zero():
+    s = resolve_settings(_empty_cli())
+    assert s.jitter == 0
+    assert s.max_idle == 0
+
+
+def test_jitter_and_max_idle_from_profile():
+    preset = {"Jitter": 15, "MaxIdle": 20}
+    s = resolve_settings(_empty_cli(), preset)
+    assert s.jitter == 15
+    assert s.max_idle == 20
