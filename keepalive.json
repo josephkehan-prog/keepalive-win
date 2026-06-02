@@ -1,0 +1,22 @@
+{
+  "profiles": {
+    "meeting": {
+      "Minutes": 120,
+      "SystemOnly": true,
+      "Quiet": false
+    },
+    "focus": {
+      "AllMicrosoftApps": true,
+      "Quiet": true
+    },
+    "overnight": {
+      "Minutes": 480,
+      "SystemOnly": true,
+      "Quiet": true
+    },
+    "tab": {
+      "BrowserKeepAlive": true,
+      "Quiet": true
+    }
+  }
+}
