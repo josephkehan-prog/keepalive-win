@@ -198,3 +198,30 @@ def test_status_line_reflects_jittered_interval():
         emit=lines.append,
     )
     assert any("next nudge in 42s" in line for line in lines)
+
+
+def test_browser_nudge_called_when_provided():
+    state = {"browser": False}
+    run_keepalive(
+        stop_when=lambda: state["browser"],  # stop once the browser nudge fired
+        browser_nudge=lambda: state.__setitem__("browser", True),
+        enable=lambda: None,
+        restore=lambda: None,
+        nudge=lambda: None,
+        tick=lambda: None,
+        emit=_noop_emit,
+    )
+    assert state["browser"] is True
+
+
+def test_default_emit_prints_to_stdout(capsys):
+    # No emit injected → the default _default_emit(print) path is exercised.
+    run_keepalive(
+        stop_when=lambda: True,
+        enable=lambda: None,
+        restore=lambda: None,
+        tick=lambda: None,
+    )
+    out = capsys.readouterr().out
+    assert "Keeping awake" in out
+    assert "normal power behavior restored" in out

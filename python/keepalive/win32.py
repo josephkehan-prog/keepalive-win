@@ -68,7 +68,7 @@ def get_idle_seconds() -> float:
     return _query_idle_seconds()
 
 
-def _query_idle_seconds() -> float:  # pragma: no cover - Windows-only ctypes
+def _query_idle_seconds() -> float:
     import ctypes
 
     class _LastInputInfo(ctypes.Structure):

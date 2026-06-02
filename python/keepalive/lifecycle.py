@@ -65,7 +65,7 @@ def pid_running(pid: Optional[int]) -> bool:
     return True
 
 
-def _pid_exists_windows(pid: int) -> bool:  # pragma: no cover - Windows-only
+def _pid_exists_windows(pid: int) -> bool:
     """Check process existence via Win32 ``OpenProcess`` (no psutil needed).
 
     A returned handle means the process exists; we still confirm it hasn't
